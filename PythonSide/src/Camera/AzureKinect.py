@@ -10,7 +10,7 @@ import copy
 
 class AzureKinectCamera(Camera):
 
-    def __init__(self, voxel_size = 0.05, min_standard_deviation = 0.2, transformed = True):
+    def __init__(self, voxel_size = 0.05, min_standard_deviation = 0.2, point_cloud_threshold = 1000, transformed = True):
         self.k4a = PyK4A(
             Config(
                 color_resolution=pyk4a.ColorResolution.RES_720P,
@@ -31,6 +31,7 @@ class AzureKinectCamera(Camera):
         self.voxel_size = voxel_size
         self.min_standard_deviation = min_standard_deviation
         self.transformed = transformed
+        self.point_cloud_threshold = point_cloud_threshold
 
     def read(self):
         self.capture = self.k4a.get_capture()
@@ -68,7 +69,7 @@ class AzureKinectCamera(Camera):
         
         for standard_deviation_factor in np.arange(self.min_standard_deviation, 1, 0.1):
             thresholded_pc = pc[(pc[:,2] < np.mean(pc[:,2]) + standard_deviation_factor* pc[:,2].std()) & (pc[:,2] > np.mean(pc[:,2]) - standard_deviation_factor* pc[:,2].std())]
-            if(thresholded_pc.shape[0] > 1000):
+            if(thresholded_pc.shape[0] > self.point_cloud_threshold):
                 self.pcd.points = o3d.utility.Vector3dVector(thresholded_pc)
                 self.pcd = self.pcd.voxel_down_sample(self.voxel_size)            
                 
@@ -94,11 +95,11 @@ class AzureKinectCamera(Camera):
         pc = pc / 100
         colour = colour / 255
         
-        for standard_deviation_factor in np.arange(self.min_standard_deviation, 1, 0.1):
+        for standard_deviation_factor in np.arange(self.min_standard_deviation, 2, 0.1):
             thresholded_pc = pc[(pc[:,2] < np.mean(pc[:,2]) + standard_deviation_factor* pc[:,2].std()) & (pc[:,2] > np.mean(pc[:,2]) - standard_deviation_factor* pc[:,2].std())]
             thresholded_colour = colour[(pc[:,2] < np.mean(pc[:,2]) + standard_deviation_factor* pc[:,2].std()) & (pc[:,2] > np.mean(pc[:,2]) - standard_deviation_factor* pc[:,2].std())]
             
-            if(thresholded_pc.shape[0] > 1000):
+            if(thresholded_pc.shape[0] > self.point_cloud_threshold):
                 self.pcd.points = o3d.utility.Vector3dVector(thresholded_pc)
                 self.pcd.colors = o3d.utility.Vector3dVector(thresholded_colour)
                 
@@ -123,4 +124,9 @@ class AzureKinectCamera(Camera):
     
     def twoDto3D(self, coordinate):
         # print(coordinate, self.capture.transformed_depth_point_cloud.shape)
-        return self.capture.transformed_depth_point_cloud[coordinate[1]][coordinate[0]] / 100
+        
+        if self.transformed:
+            # If the user wants the transformed depth point cloud or not
+            return self.capture.transformed_depth_point_cloud[coordinate[1]][coordinate[0]] / 100
+        else:
+            return self.capture.depth_point_cloud[coordinate[1]][coordinate[0]] / 100

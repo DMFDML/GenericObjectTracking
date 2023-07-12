@@ -27,7 +27,7 @@ def loadPCD(num, path, colour = np.array([1, 0, 0])):
 if __name__ == "__main__":
 
     print("1. Load two point clouds and show initial pose")
-    pcds = loadPCD(12, "images/pc", np.array([1, 0, 0]))
+    # pcds = loadPCD(12, "images/pc", np.array([1, 0, 0]))
     # originals = loadPCD(10, "images/original", np.array([0, 0, 1]))
     originalPcd = o3d.io.read_point_cloud("images/original.ply")
     # originalPcd.paint_uniform_color([0,0,1])

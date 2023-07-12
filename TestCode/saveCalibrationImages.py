@@ -10,12 +10,9 @@ import imageio
 
 # Outputs the point cloud as a json file
 def outputPCImage(capture, no):
-    pc = capture.transformed_depth_point_cloud
-    colour = capture.color[:,:, :3]
+    cv2.imwrite(f"images/calibration/azureCalibrate{no}.png", capture.color)
+    print(f"writing image images/calibration/calibrate{no}.png")
 
-    imageio.imwrite("images/pcds/pc" + str(no) + ".tif", pc)
-    imageio.imwrite("images/colours/colour" + str(no) + ".jpg", colour)
-    print("saved " + str(no))
 
 def main():
 
@@ -37,12 +34,22 @@ def main():
     pcd = o3d.geometry.PointCloud()
 
     save = 1
+    print(k4a.calibration.get_camera_matrix(pyk4a.calibration.CalibrationType.COLOR), " ", k4a.calibration.get_distortion_coefficients(pyk4a.calibration.CalibrationType.COLOR))
 
-    for i in range(100):
+    while True:
         capture = k4a.get_capture()
+
         if np.any(capture.color) and np.any(capture.depth):
 
-            outputPCImage(capture, i)
+            cv2.imshow("image", capture.color)
+        
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
+            break
+        if key == ord('s'):
+            
+            outputPCImage(capture, save)
+            save+=1
 
 
     k4a.stop()

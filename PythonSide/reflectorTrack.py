@@ -19,7 +19,7 @@ import open3d as o3d
 
 class ReflectorTrack(ObjectTracker):
 
-    def __init__(self, sock, camera, ip=UDP_IP, port=UDP_PORT, marker_size=1, voxel_size = VOXEL_SIZE, colour = COLOUR, no_iterations = NO_ITERATIONS):
+    def __init__(self, sock, camera, ip=UDP_IP, port=UDP_PORT, voxel_size = VOXEL_SIZE, colour = COLOUR, no_iterations = NO_ITERATIONS):
         self.camera = camera
 
         self.sock = sock
@@ -170,7 +170,8 @@ class ReflectorTrack(ObjectTracker):
             # return self.previous_matrix, pc.get_center()
         print(result_icp.inlier_rmse, result_icp.fitness )
         # Add the new point cloud to the original if there is enough overlap but not too much
-        if (result_icp.inlier_rmse > 0.05 and result_icp.inlier_rmse < 0.2 and result_icp.fitness > 0.95):
+        if (result_icp.inlier_rmse > 0.055 and result_icp.inlier_rmse < 0.3 and result_icp.fitness > 0.95):
+        
             self._addToOriginalPointCloud(pc, result_icp.transformation)
 
         self.previous_matrix, self.previous_centre = result_icp.transformation, pc.get_center()
@@ -287,10 +288,10 @@ if __name__ == "__main__":
         else:
             camera = FakeCamera(videoPath=args.videoPath)
     else:
-        camera = AzureKinectCamera(transformed = False, voxel_size=0.025)
+        camera = AzureKinectCamera(transformed = False, voxel_size=0.03, min_standard_deviation=1, point_cloud_threshold=2000)
     
    
-    objectTracker = ReflectorTrack(sock, camera, ip=args.ip, port=5064, voxel_size=0.025, no_iterations=50)
+    objectTracker = ReflectorTrack(sock, camera, ip=args.ip, port=args.port, voxel_size=0.05, no_iterations=30)
 
     objectTracker.startTracking()
     

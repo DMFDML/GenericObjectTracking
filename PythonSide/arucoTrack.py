@@ -9,19 +9,23 @@ import socket
 from math import atan2, cos, sin, sqrt, pi
 from src.Camera.AzureKinect import AzureKinectCamera
 from src.Camera.FakeCamera import FakeCamera
+from src.Camera.OpenCVCamera import OpenCVCamera
 import argparse
 from ObjectTrackerInterface import ObjectTracker
-
+import glob
+    
 
 
 class ArucoTracker(ObjectTracker):
 
-    def __init__(self, sock, camera, aruco_type, ip=UDP_IP, port=UDP_PORT, marker_size=1):
+    def __init__(self, sock, camera, aruco_type, ip=UDP_IP, port=UDP_PORT, marker_size=400):
         self.camera = camera
         self.aruco_type = cv2.aruco.Dictionary_get(ARUCO_DICT[aruco_type])
         
         self.arucoParams = cv2.aruco.DetectorParameters_create()
         self.intrinsic, self.distortion = camera.get_calibration()
+
+
         self.sock = sock
         self.ip = ip
         self.port = port
@@ -37,21 +41,41 @@ class ArucoTracker(ObjectTracker):
         self.moving_average_length = 10
         self.moving_average_weights = np.array([0.2,0.2,0.4,0.4,0.6,0.6,0.8,0.8,1,1])
 
+    def _to_quaternion(self, rotation):
+        """
+        Convert an Euler angle to a quaternion.
+        
+        Input
+            :param roll: The roll (rotation around x-axis) angle in radians.
+            :param pitch: The pitch (rotation around y-axis) angle in radians.
+            :param yaw: The yaw (rotation around z-axis) angle in radians.
+        
+        Output
+            :return qx, qy, qz, qw: The orientation in quaternion [x,y,z,w] format
+        """
+        roll, pitch, yaw = rotation
+
+        qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+        qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
+        qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
+        qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+        
+        return [qx, qy, qz, qw]
         
     def _moving_average(self, new_value):
         if len(self.moving_average_rotation) >= self.moving_average_length:
             self.moving_average_rotation.pop(0)
-        if new_value[0] < 0:
-            new_value[0] += 2*pi
-        if new_value[1] < 0:
-            new_value[1] += 2*pi
-        if new_value[2] < 0:
-            new_value[2] += 2*pi
+        # if new_value[0] < 0:
+        #     new_value[0] += 2*pi
+        # if new_value[1] < 0:
+        #     new_value[1] += 2*pi
+        # if new_value[2] < 0:
+        #     new_value[2] += 2*pi
 
 
         self.moving_average_rotation.append(new_value)
 
-        return np.sum(np.asarray(self.moving_average_rotation) * self.moving_average_weights.reshape(-1, 1)[:len(self.moving_average_rotation)], axis=0) / np.sum(self.moving_average_weights)
+        return np.mean(np.array(self.moving_average_rotation), axis=0)
 
     def _aruco_display(self, corners, ids, rvecs, tvecs,image, colour=(0, 0, 255)):
         
@@ -94,16 +118,19 @@ class ArucoTracker(ObjectTracker):
         
         for i in range(len(corners)):
 
-            _, rvec, tvec = cv2.solvePnP(self.marker_points, corners[i], self.intrinsic,self.distortion, False, cv2.SOLVEPNP_IPPE_SQUARE)
+            rvec, tvec, markerPoints = cv2.aruco.estimatePoseSingleMarkers(corners[i], self.marker_size, self.intrinsic,
+                                                                    self.distortion)
+            rvec, tvec = rvec.reshape(3), tvec.reshape(3)
+            
+            print(rvec, " ", self._to_quaternion(rvec))
             offcet = OFFCET_DICT.get(ids[i][0], {"translation": [0, 0, 0], "rotation": [0, 0, 0]})
-            rvec, tvec = rvec.reshape((1, 3)), tvec.reshape((1, 3))
 
-            rvec[0] += offcet["rotation"]
-            tvec[0] += offcet["translation"]
+            # rvec[0] += offcet["rotation"]
+            # tvec[0] += offcet["translation"]
             # print(rvec, " ", tvec)
 
-            rvecs.append(rvec[0])
-            tvecs.append(tvec[0])
+            rvecs.append(rvec)
+            tvecs.append(tvec)
 
             box_centre = np.asarray(np.mean(corners[i][0], axis=0), dtype=np.int)
 
@@ -135,7 +162,7 @@ class ArucoTracker(ObjectTracker):
 
                 moving_average_rvecs = self._moving_average(rvecs[closest_aruco])
                 # print(closest_aruco, " ", centre)
-                print(self._radToDeg(moving_average_rvecs))
+                # print(self._radToDeg(moving_average_rvecs))
                 self.sendData(self._radToDeg(moving_average_rvecs), centre[closest_aruco])
 
             # Calcuale fps and display
@@ -148,7 +175,13 @@ class ArucoTracker(ObjectTracker):
             k = cv2.waitKey(1)
             if k & 0xFF == ord('q'):
                 break
-            
+            if k & 0xFF == ord('b'):
+                self.marker_size += 1
+                self.marker_points = np.array([[-self.marker_size / 2, self.marker_size / 2, 0],
+                              [self.marker_size / 2, self.marker_size / 2, 0],
+                              [self.marker_size / 2, -self.marker_size / 2, 0],
+                              [-self.marker_size / 2, -self.marker_size / 2, 0]], dtype=np.float32)
+                print("Marker size: ", self.marker_size)
         self.camera.stop()
 
     def benchMark(self):
@@ -167,6 +200,8 @@ if __name__ == "__main__":
                     help='If a camera is being used or not')
     parser.add_argument('--videoPath', dest='videoPath', default=None,
                     help='The path to the images being used')
+    parser.add_argument('--marker', dest='marker', type = int,
+                        default=400, help='The size of the aruco marker being used')
 
     args = parser.parse_args()
 
@@ -179,10 +214,12 @@ if __name__ == "__main__":
         else:
             camera = FakeCamera(videoPath=args.videoPath)
     else:
-        camera = AzureKinectCamera()
+        # camera = AzureKinectCamera()
+        camera = OpenCVCamera(camera_id=2)
+
     
    
-    objectTracker = ArucoTracker(sock, camera, args.type, ip=args.ip, port=5064)
+    objectTracker = ArucoTracker(sock, camera, args.type, ip=args.ip, port=5064, marker_size=args.marker)
 
     objectTracker.startTracking()
     

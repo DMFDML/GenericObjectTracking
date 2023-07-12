@@ -9,6 +9,7 @@ from dataclasses import dataclass
 # from sort.tracker import SortTracker
 # from deep_sort_realtime.deepsort_tracker import DeepSort
 # from sort_oh.tracker import Sort_OH
+import glob
 
 ARUCO_DICT = {
 	"DICT_4X4_50": cv2.aruco.DICT_4X4_50,
@@ -34,14 +35,80 @@ ARUCO_DICT = {
 	"DICT_APRILTAG_36h11": cv2.aruco.DICT_APRILTAG_36h11
 }
 
-@dataclass(frozen=True)
-class BYTETrackerArgs:
-    track_thresh: float = 0.25
-    track_buffer: int = 30
-    match_thresh: float = 0.8
-    aspect_ratio_thresh: float = 3.0
-    min_box_area: float = 1.0
-    mot20: bool = False
+CHECKERBOARD = (6, 9)
+def cameraCalibration():
+    
+    # stop the iteration when specified
+    # accuracy, epsilon, is reached or
+    # specified number of iterations are completed.
+    criteria = (cv2.TERM_CRITERIA_EPS + 
+                cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+    
+    
+    # Vector for 3D points
+    threedpoints = []
+    
+    # Vector for 2D points
+    twodpoints = []
+    
+    
+    #  3D points real world coordinates
+    objectp3d = np.zeros((1, CHECKERBOARD[0] 
+                        * CHECKERBOARD[1], 
+                        3), np.float32)
+    objectp3d[0, :, :2] = np.mgrid[0:CHECKERBOARD[0],
+                                0:CHECKERBOARD[1]].T.reshape(-1, 2)
+    prev_img_shape = None
+    
+    
+    # Extracting path of individual image stored
+    # in a given directory. Since no path is
+    # specified, it will take current directory
+    # jpg files alone
+    images = glob.glob('images/calibration/calibrate*.png')
+    
+    for filename in images:
+        image = cv2.imread(filename)
+        grayColor = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+        # Find the chess board corners
+        # If desired number of corners are
+        # found in the image then ret = true
+        ret, corners = cv2.findChessboardCorners(
+                        grayColor, CHECKERBOARD, 
+                        cv2.CALIB_CB_ADAPTIVE_THRESH 
+                        + cv2.CALIB_CB_FAST_CHECK + 
+                        cv2.CALIB_CB_NORMALIZE_IMAGE)
+    
+        # If desired number of corners can be detected then,
+        # refine the pixel coordinates and display
+        # them on the images of checker board
+        if ret == True:
+            threedpoints.append(objectp3d)
+    
+            # Refining pixel coordinates
+            # for given 2d points.
+            corners2 = cv2.cornerSubPix(
+                grayColor, corners, (11, 11), (-1, -1), criteria)
+    
+            twodpoints.append(corners2)
+    
+    # Perform camera calibration by
+    # passing the value of above found out 3D points (threedpoints)
+    # and its corresponding pixel coordinates of the
+    # detected corners (twodpoints)
+    ret, matrix, distortion, r_vecs, t_vecs = cv2.calibrateCamera(
+        threedpoints, twodpoints, grayColor.shape[::-1], None, None)
+    
+    
+    # Displaying required output
+    print(" Camera matrix:")
+    print(matrix)
+    
+    print("\n Distortion coefficient:")
+    print(distortion)
+    return matrix, distortion
+
 
 def draw_bounding_boxs(img, boxes, colour=(0, 255, 255)):
     for b in boxes:
@@ -111,29 +178,27 @@ def pose_estimation(frame, aruco_dict_type, matrix_coefficients, distortion_coef
         
     for i in range(0, len(corners)):
 
-        rvec, tvec, markerPoints = cv2.aruco.estimatePoseSingleMarkers(corners[i], 0.02, matrix_coefficients,
+        rvec, tvec, markerPoints = cv2.aruco.estimatePoseSingleMarkers(corners[i], 400, matrix_coefficients,
                                                                     distortion_coefficients)
 
-        cv2.drawFrameAxes(frame, matrix_coefficients, distortion_coefficients, rvec, tvec, 0.01)  
-
+        cv2.drawFrameAxes(frame, matrix_coefficients, distortion_coefficients, rvec, tvec, 400)  
+        print(rvec)
    
     return frame
 
 
     
 
-aruco_type = "DICT_4X4_50"
+aruco_type = "DICT_4X4_250"
 
 arucoDict = cv2.aruco.Dictionary_get(ARUCO_DICT[aruco_type])
 
 arucoParams = cv2.aruco.DetectorParameters_create()
 
 
-intrinsic_camera = np.array(((933.15867, 0, 657.59),(0,933.1586, 400.36993),(0,0,1)))
-distortion = np.array((-0.43948,0.18514,0,0))
+intrinsic_camera, distortion = cameraCalibration()
 
-
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(2, cv2.CAP_DSHOW)
 
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)

@@ -46,11 +46,10 @@ if __name__ == "__main__":
 
     arucoDict = aruco.Dictionary_get(ARUCO_DICT[args["type"]])
 
-    for size in [75, 100, 250]:
-        for i in range(args.get("id")):
-            tag = np.zeros((size,size, 1), dtype="uint8")
-            aruco.drawMarker(arucoDict, i, args.get("size"), tag, 1)
-            cv2.imwrite(f"{args.get('output')}/{size}aruco{i}.png", tag)
+    for i in range(args.get("id")):
+        tag = np.zeros((args['size'],args['size'], 1), dtype="uint8")
+        aruco.drawMarker(arucoDict, i, args.get("size"), tag, 1)
+        cv2.imwrite(f"{args.get('output')}/{args['type']}aruco{i}.png", tag)
 
 
 

@@ -69,6 +69,8 @@ OFFCET_DICT = {
 
 }
 
+CHECKERBOARD = (6,9)
+
 # Fake Camera Constants
 IMAGE_FILE_LOCATIONS = "../TestCode/images/"
 
