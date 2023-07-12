@@ -13,12 +13,13 @@ from src.Camera.OpenCVCamera import OpenCVCamera
 import argparse
 from ObjectTrackerInterface import ObjectTracker
 import glob
+from objectTrackingConstants import DISTANCE_CONVERSION
     
 
 
 class ArucoTracker(ObjectTracker):
 
-    def __init__(self, sock, camera, aruco_type, ip=UDP_IP, port=UDP_PORT, marker_size=400):
+    def __init__(self, sock, camera, aruco_type, ip=UDP_IP, port=UDP_PORT, marker_size=40):
         self.camera = camera
         self.aruco_type = cv2.aruco.Dictionary_get(ARUCO_DICT[aruco_type])
         
@@ -38,40 +39,16 @@ class ArucoTracker(ObjectTracker):
 
         self.moving_average_rotation = [(0,0,0)]
         # self.moving_average_translation = [(0,0,0)]
-        self.moving_average_length = 10
+        self.moving_average_length = 5
         self.moving_average_weights = np.array([0.2,0.2,0.4,0.4,0.6,0.6,0.8,0.8,1,1])
+        self.display_values = []
 
-    def _to_quaternion(self, rotation):
-        """
-        Convert an Euler angle to a quaternion.
-        
-        Input
-            :param roll: The roll (rotation around x-axis) angle in radians.
-            :param pitch: The pitch (rotation around y-axis) angle in radians.
-            :param yaw: The yaw (rotation around z-axis) angle in radians.
-        
-        Output
-            :return qx, qy, qz, qw: The orientation in quaternion [x,y,z,w] format
-        """
-        roll, pitch, yaw = rotation
+        self.previous_rotation = np.array([0,0,0,0])
+        self.previous_centre = np.array([0,0,0])
 
-        qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
-        qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
-        qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
-        qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
-        
-        return [qx, qy, qz, qw]
-        
     def _moving_average(self, new_value):
         if len(self.moving_average_rotation) >= self.moving_average_length:
             self.moving_average_rotation.pop(0)
-        # if new_value[0] < 0:
-        #     new_value[0] += 2*pi
-        # if new_value[1] < 0:
-        #     new_value[1] += 2*pi
-        # if new_value[2] < 0:
-        #     new_value[2] += 2*pi
-
 
         self.moving_average_rotation.append(new_value)
 
@@ -109,40 +86,56 @@ class ArucoTracker(ObjectTracker):
                 
         return image
 
-    def _radToDeg(self, rad):
-        return rad * 180 / pi
-
     def _calculateRotationAndTranslation(self, corners, ids):
         rvecs, tvecs = [], []
-        centre = []
+        quaternions, centres = [], []
         
         for i in range(len(corners)):
-
-            rvec, tvec, markerPoints = cv2.aruco.estimatePoseSingleMarkers(corners[i], self.marker_size, self.intrinsic,
+            # Calculate the pose estimation for one of the detected markers
+            rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], self.marker_size, self.intrinsic,
                                                                     self.distortion)
             rvec, tvec = rvec.reshape(3), tvec.reshape(3)
-            
-            print(rvec, " ", self._to_quaternion(rvec))
-            offcet = OFFCET_DICT.get(ids[i][0], {"translation": [0, 0, 0], "rotation": [0, 0, 0]})
-
-            # rvec[0] += offcet["rotation"]
-            # tvec[0] += offcet["translation"]
-            # print(rvec, " ", tvec)
 
             rvecs.append(rvec)
             tvecs.append(tvec)
+            # Convert the rvec value to a 3x3 rotation matrix
+            r = cv2.Rodrigues(rvec)
+            # Convert the rotation matrix to Euler values (should probably just use Quaternion)
+            quaternion = self._rotationMatrixToQuaternion(r[0])
+            offcet = OFFCET_DICT.get(ids[i][0], {"translation": [0, 0, 0], "rotation": [0, 0, 0, 0]})
 
-            box_centre = np.asarray(np.mean(corners[i][0], axis=0), dtype=np.int)
 
-            # Add different id's having different translation and rotation offcets !!!
+            # Add rotaiton and translation offcets to the angles depending on which aruco is being seen
+            quaternion = self._multiplyQuaternions(offcet["rotation"], quaternion)
+            centre = tvec + offcet['translation']
 
-            centre.append(self.camera.twoDto3D(box_centre) + offcet["translation"])
+            quaternions.append(quaternion)
+            centres.append(centre)
 
+        return rvecs, tvecs, quaternions, np.asarray(centres)
 
+    def _trackFrame(self, img):
+        # Detect aruco markers
+        (corners, ids, _) = cv2.aruco.detectMarkers(img, self.aruco_type, parameters=self.arucoParams)
+        if len(corners) > 0:
+            rvecs, tvecs, quaternions, centre = self._calculateRotationAndTranslation(corners, ids)
+
+            # Calculate which aruco is closest to the camera
+            closest_aruco = np.argmin(centre[:, 2])
+
+            # moving_average_rvecs = self._moving_average(eulers[closest_aruco])
+            self.display_values = [corners, ids, rvecs, tvecs]
+
+            # Send data, / 1000 is due to opencv working in mm and unity working in m
+            self.previous_rotation, self.previous_centre = (quaternions[closest_aruco], centre[closest_aruco] / DISTANCE_CONVERSION)
+            return self.previous_rotation, self.previous_centre
+        else:
+            return self.previous_rotation, self.previous_centre
         
-        return rvecs, tvecs, np.asarray(centre)
+
 
     def startTracking(self):
+        started = False
         while True:
             # Start timer for fps calculation
             timer = cv2.getTickCount()
@@ -152,18 +145,11 @@ class ArucoTracker(ObjectTracker):
                 print("Can't read image from camera")
                 break
 
-            # Detect aruco markers
-            (corners, ids, rejected) = cv2.aruco.detectMarkers(img, self.aruco_type, parameters=self.arucoParams)
-            if len(corners) > 0:
-                rvecs, tvecs, centre = self._calculateRotationAndTranslation(corners, ids)
+            if started:
+                rotation, centre = self._trackFrame(img)
+                self.sendData(rotation, centre)
 
-                self._aruco_display(corners, ids, rvecs, tvecs, img)
-                closest_aruco = np.argmin(centre[:, 2])
-
-                moving_average_rvecs = self._moving_average(rvecs[closest_aruco])
-                # print(closest_aruco, " ", centre)
-                # print(self._radToDeg(moving_average_rvecs))
-                self.sendData(self._radToDeg(moving_average_rvecs), centre[closest_aruco])
+                self._aruco_display(self.display_values[0],self.display_values[1],self.display_values[2],self.display_values[3], img)
 
             # Calcuale fps and display
             fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
@@ -182,6 +168,8 @@ class ArucoTracker(ObjectTracker):
                               [self.marker_size / 2, -self.marker_size / 2, 0],
                               [-self.marker_size / 2, -self.marker_size / 2, 0]], dtype=np.float32)
                 print("Marker size: ", self.marker_size)
+            if k == ord('s'):
+                started = not started
         self.camera.stop()
 
     def benchMark(self):
@@ -200,6 +188,8 @@ if __name__ == "__main__":
                     help='If a camera is being used or not')
     parser.add_argument('--videoPath', dest='videoPath', default=None,
                     help='The path to the images being used')
+    parser.add_argument('--cameraid', dest='cameraid', type=int, default=0, help="The camera ID")
+    parser.add_argument('--calibration', dest='calibration', type=str, default='images\calibration\calibrate*.png', help="The path to images for camera calibration")
     parser.add_argument('--marker', dest='marker', type = int,
                         default=400, help='The size of the aruco marker being used')
 
@@ -215,7 +205,7 @@ if __name__ == "__main__":
             camera = FakeCamera(videoPath=args.videoPath)
     else:
         # camera = AzureKinectCamera()
-        camera = OpenCVCamera(camera_id=2)
+        camera = OpenCVCamera(camera_id=args.cameraid, calibration_files=args.calibration)
 
     
    

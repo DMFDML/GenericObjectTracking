@@ -16,6 +16,9 @@ FAKE_CAMERA = False
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5065
 
+# The conversion between camera space to world space, opencv and azure kinect use mm but unity uses m so have to convert between!!
+DISTANCE_CONVERSION = 1000
+
 # Aruco Constants
 ARUCO_TYPE = "DICT_4X4_50"
 ARUCO_DICT = {
@@ -44,27 +47,31 @@ ARUCO_DICT = {
 OFFCET_DICT = {
     0: { # front
         "translation": [0, 0, 0],
-        "rotation": [0, 0, 0]
+        "rotation": [0, 0, 0, 0]
     },
     1: { # back
         "translation": [0, 0, 0],
-        "rotation": [0, pi, 0]
+        "rotation": [0, 0, 1, 0]
     },
     2: { # left
         "translation": [0, 0, 0],
-        "rotation": [pi, 0, 0]
+        "rotation": [0, 1, 0, 0]
     },
     3: { # right
         "translation": [0, 0, 0],
-        "rotation": [-pi, 0, 0]
+        "rotation": [0, -1, 0, 0]
     },
     4: { # top
         "translation": [0, 0, 0],
-        "rotation": [0, 0, pi]
+        "rotation": [0, 0, 0, 1]
     },
     6: { # bottom
         "translation": [0, 0, 0],
-        "rotation": [0, 0, -pi]
+        "rotation": [0, 0, 0, 1]
+    },
+    11: { # anotherOne
+        "translation": [0, 0, 0],
+        "rotation": [0, 0, 1, 0]
     }
 
 }

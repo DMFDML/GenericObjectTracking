@@ -6,6 +6,7 @@ from pyk4a import Config, PyK4A, Calibration, CalibrationType
 import open3d as o3d
 from src.Camera.Camera import Camera
 import copy
+from objectTrackingConstants import DISTANCE_CONVERSION
 
 
 class AzureKinectCamera(Camera):
@@ -64,10 +65,9 @@ class AzureKinectCamera(Camera):
             mask = mask[bbox[1]:bbox[1]+bbox[3], bbox[0]:bbox[0]+bbox[2]].reshape(-1).astype(np.bool)
             pc = pc[mask]
         
-        # convert from cm to mm as open3d didn't like the mm
-        pc = pc / 100
-        
-        for standard_deviation_factor in np.arange(self.min_standard_deviation, 1, 0.1):
+        # convert from mm to m as open3d didn't like the mm
+        pc = pc / DISTANCE_CONVERSION
+        for standard_deviation_factor in np.arange(self.min_standard_deviation, 3, 0.1):
             thresholded_pc = pc[(pc[:,2] < np.mean(pc[:,2]) + standard_deviation_factor* pc[:,2].std()) & (pc[:,2] > np.mean(pc[:,2]) - standard_deviation_factor* pc[:,2].std())]
             if(thresholded_pc.shape[0] > self.point_cloud_threshold):
                 self.pcd.points = o3d.utility.Vector3dVector(thresholded_pc)
@@ -92,10 +92,9 @@ class AzureKinectCamera(Camera):
             pc = pc[mask]
             colour = colour[mask]
         
-        pc = pc / 100
+        pc = pc / DISTANCE_CONVERSION
         colour = colour / 255
-        
-        for standard_deviation_factor in np.arange(self.min_standard_deviation, 2, 0.1):
+        for standard_deviation_factor in np.arange(self.min_standard_deviation, 3, 0.1):
             thresholded_pc = pc[(pc[:,2] < np.mean(pc[:,2]) + standard_deviation_factor* pc[:,2].std()) & (pc[:,2] > np.mean(pc[:,2]) - standard_deviation_factor* pc[:,2].std())]
             thresholded_colour = colour[(pc[:,2] < np.mean(pc[:,2]) + standard_deviation_factor* pc[:,2].std()) & (pc[:,2] > np.mean(pc[:,2]) - standard_deviation_factor* pc[:,2].std())]
             

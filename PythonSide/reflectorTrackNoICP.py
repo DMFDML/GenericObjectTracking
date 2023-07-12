@@ -6,7 +6,7 @@ import time
 from objectTrackingConstants import *
 import socket
 
-from math import atan2, cos, acos, sin, sqrt, pi
+from math import atan2, cos, acos, sin, sqrt, pi, asin
 from src.Camera.AzureKinect import AzureKinectCamera
 from src.Camera.FakeCamera import FakeCamera
 import argparse
@@ -61,6 +61,10 @@ class ReflectorTrackNoICP(ObjectTracker):
 
         self.detector = cv2.SimpleBlobDetector_create(params)
         self.initial_rotation = None
+
+        self.points = []
+        self.previous_rotation = np.array([0,0,0])
+        self.previous_centre = np.array([0,0,0])
         
         
     def _movingAverage(self, new_value):
@@ -78,9 +82,6 @@ class ReflectorTrackNoICP(ObjectTracker):
 
         return np.sum(np.asarray(self.moving_average_rotation) * self.moving_average_weights.reshape(-1, 1)[:len(self.moving_average_rotation)], axis=0) / np.sum(self.moving_average_weights)
     
-    def _radToDeg(self, rad):
-        return rad * 180 / pi
-
     def _getPolygon(self, points):
         
         xys = []
@@ -121,20 +122,25 @@ class ReflectorTrackNoICP(ObjectTracker):
                 if z > 0 and z < 1000:
                     points[-1]['centre_xyz'].append((x, y, z))
             
-            # Add points within the circle
-            for p in points_eroded:
-                # If point is within the cluster circle
-                if c.pt[0] + c.size > p.pt[0] > c.pt[0] - c.size and c.pt[1] + c.size > p.pt[1] > c.pt[1] - c.size:
-                    points[-1]['points'].append(p)
-                    # Add points on the outer perimeter of the circle due to the centre not having a depth measurement
-                    for i in np.arange(0, pi * 2, pi / 4):
-                        # get the x,y coordinates of the point on the perimeter 1.9 is used instead of 2 as we want it just outside the circle
-                        x, y = (p.pt[0] + p.size/1.5 * cos(i), p.pt[1] + p.size/1.5 *sin(i))
-                        x,y = min(max(x, 0), depth.shape[1]-1), min(max(y, 0), depth.shape[0]-1)
-                        z = depth[int(y), int(x)]
-                        if z > 0:
-                            points[-1]['point_xyz'].append((x, y, z))
-                    
+            # If there are no valid points on the perimeter of the cluster don't add any interior points
+            if len(points[-1]['centre_xyz']) > 0:
+                # Add points within the circle
+                for p in points_eroded:
+                    # If point is within the cluster circle
+                    if c.pt[0] + c.size > p.pt[0] > c.pt[0] - c.size and c.pt[1] + c.size > p.pt[1] > c.pt[1] - c.size:
+                        points[-1]['points'].append(p)
+                        # Add points on the outer perimeter of the circle due to the centre not having a depth measurement
+                        for i in np.arange(0, pi * 2, pi / 4):
+                            # get the x,y coordinates of the point on the perimeter 1.9 is used instead of 2 as we want it just outside the circle
+                            x, y = (p.pt[0] + p.size/1.5 * cos(i), p.pt[1] + p.size/1.5 *sin(i))
+                            x,y = min(max(x, 0), depth.shape[1]-1), min(max(y, 0), depth.shape[0]-1)
+                            z = depth[int(y), int(x)]
+                            if z > 0:
+                                points[-1]['point_xyz'].append((x, y, z))
+            else:
+                points.pop()
+            
+                
         return points
 
     def _getPlanes(self, points):
@@ -169,6 +175,7 @@ class ReflectorTrackNoICP(ObjectTracker):
             total += centre_xyz.sum(axis=0)
             total += point_xyz.sum(axis=0)
             amount += len(centre_xyz) + len(point_xyz)
+        
         return total / amount
 
     def _getRotation(self, planes, centre_plane):
@@ -189,13 +196,35 @@ class ReflectorTrackNoICP(ObjectTracker):
         normal = np.sum(normals * weights, axis=0) / np.sum(weights)
         normal = normal / np.linalg.norm(normal)
 
-        up = acos(np.dot(normal, np.array([0, 0, 1])))
-        right = acos(np.dot(normal, np.array([0, 1, 0])))
-        forward = acos(np.dot(normal, np.array([1, 0, 0])))
+        # up = np.dot(normal, np.array([0, 0, 1]))
+        # right = np.dot(normal, np.array([0, 1, 0]))
+        # forward = np.dot(normal, np.array([1, 0, 0]))
+        roll = 0
+        pitch = asin(-normal[1])
+        yaw = atan2(normal[0], normal[2])
 
-        return np.array([self._radToDeg(right), self._radToDeg(up), 0])        
+
+        return self._radToDeg(np.array([pitch, yaw, roll]))        
+
+    def _trackFrame(self, img, depth):
+        self.points = self._getPointsAndClusters(img, depth)
+
+        if len(self.points) > 0:
+            planes, centre_plane = self._getPlanes(self.points)
+            centre = self._getCentre(self.points)
+
+            rotation = self._getRotation(planes, centre_plane)
+
+            if self.initial_rotation is None:
+                self.initial_rotation = rotation.copy()
+            
+            self.previous_rotation, self.previous_centre = (rotation - self.initial_rotation, self.camera.twoDto3D((int(centre[0]), int(centre[1]))))
+            return self.previous_rotation, self.previous_centre
+        else:
+            return self.previous_rotation, self.previous_centre
 
     def startTracking(self):
+        started = False
         while True:
             # Start timer for fps calculation
             timer = cv2.getTickCount()
@@ -208,18 +237,9 @@ class ReflectorTrackNoICP(ObjectTracker):
                 print("Can't read image from camera")
                 break
 
-            points = self._getPointsAndClusters(ir_thresholded, depth)
-            if len(points) > 0:
-                planes, centre_plane = self._getPlanes(points)
-                centre = self._getCentre(points)
-
-                rotation = self._getRotation(planes, centre_plane)
-                
-
-                if self.initial_rotation is None:
-                    self.initial_rotation = rotation
-                print(rotation - self.initial_rotation)
-                self.sendData(rotation - self.initial_rotation, self.camera.twoDto3D((int(centre[0]), int(centre[1]))))
+            if started:
+                rotation, centre = self._trackFrame(ir_thresholded, depth)
+                self.sendData(rotation, centre)
             
             # NEED TO WORK OUT HOW TO TRANSFROM FROM IR TO COLOUR FOR POINT CLOUD !!!!!!!!!!!!!!!!      
 
@@ -227,7 +247,7 @@ class ReflectorTrackNoICP(ObjectTracker):
             ir_colour = ir_colour.copy()
             # ir_colour = self.camera.capture.transformed_color.copy()
             
-            for c in points:
+            for c in self.points:
                 polygon = self._getPolygon(c['points'])
                 if len(polygon) > 2:
                     cv2.fillPoly(ir_colour, [polygon], (255,0,0))
@@ -265,6 +285,8 @@ class ReflectorTrackNoICP(ObjectTracker):
                         pass
 
                 plt.show()
+            elif k == ord('s'):
+                started = not started
         self.camera.stop()
 
     def benchMark(self):

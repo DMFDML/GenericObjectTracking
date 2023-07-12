@@ -21,7 +21,6 @@ class GenericObjectTracker(ObjectTracker):
         self.camera = camera
 
         self.sock = sock
-        self.save = 0
 
         self.previous_matrix = np.identity(4)
         self.previous_centre = np.array([0,0,0])
@@ -33,7 +32,9 @@ class GenericObjectTracker(ObjectTracker):
         self.ip = ip
         self.port = port
         if box != []:
-            self._startTrackingBox(box)     
+            self._startTrackingBox(box)  
+
+        self.previous_rotation = np.array([0,0,0])   
 
     # Prompts the user to draw a bounding box around the object to be tracked
     def _startTrackingBox(self, box = []):
@@ -59,17 +60,15 @@ class GenericObjectTracker(ObjectTracker):
         # return the shrunk image
         return img[y1:y2, x1:x2]
 
-    def _rotationMatrixToEulerAngles(self, rotation) :
-        r_x,r_y,r_z = atan2(rotation[2,1], rotation[2,2]), atan2(-rotation[2,0], sqrt(rotation[2,1]**2 + rotation[2,2]**2)), atan2(rotation[1,0], rotation[0,0])
-        r_x,r_y,r_z = r_x*180/pi, r_y*180/pi, r_z*180/pi
-        return np.array([r_x, r_y, r_z])
-
+    # Add a new point cloud to the reference point cloud
     def _addToOriginalPointCloud(self, pcd, transform):
+        # As I am using point to plane for the refining both point clouds must have normals
         if not pcd.has_normals():
             pcd.estimate_normals(
                 o3d.geometry.KDTreeSearchParamHybrid(radius=self.voxel_size * 2, max_nn=30))
-
-        if (np.asarray(self.original_point_cloud.points).shape[0] > 0):
+        # Only refine the translation and rotation if the reference point cloud has points in it
+        if (len(self.original_point_cloud.points) > 0):
+            # further refine the point cloud using point to plane and robust kernels
             loss = o3d.pipelines.registration.TukeyLoss(k=0.1)
             p2l = o3d.pipelines.registration.TransformationEstimationPointToPlane(loss)
             result_icp = o3d.pipelines.registration.registration_icp(pcd, self.original_point_cloud, 0.1, transform,
@@ -82,25 +81,25 @@ class GenericObjectTracker(ObjectTracker):
                 return
             pcd.transform(result_icp.transformation)
             print(result_icp.fitness, " ", result_icp.inlier_rmse)
+
+        # Add to the original point cloud, voxelise it to reduce the amount of overlap and estimate the normals
         self.original_point_cloud += pcd
         self.original_point_cloud = self.original_point_cloud.voxel_down_sample(self.voxel_size)
         self.original_point_cloud.estimate_normals(
                     o3d.geometry.KDTreeSearchParamHybrid(radius=self.voxel_size * 2, max_nn=30))
 
         print("Adding POINT CLOUD ", np.asarray(self.original_point_cloud.points).shape[0])
-        o3d.io.write_point_cloud("./images/pc" + str(self.save)+".ply", self.original_point_cloud)
-        self.save += 1
 
     def _getTranslationRotationMatrix(self, bbox):
         # Get PointCloud
         pc = self.camera.getPointCloud(bbox, self.tracker.getMask(), self.colour)
 
-        if (np.asarray(pc.points).shape[0] == 0):
-            return self._rotationMatrixToEulerAngles(self.previous_matrix), self.previous_centre
-            # return self.previous_matrix, self.previous_centre
+        # If the point cloud has not got any points then don't perform ICP on it
+        if (len(pc.points) == 0):
+            return self._rotationMatrixToQuaternion(self.previous_matrix), self.previous_centre
         
 
-        # Perform ICP on the originaly generated point cloud and the new one
+        # Perform either ICP or coloured ICP between the reference point cloud and the new one
         try:
             if (self.colour):
                 result_icp = o3d.pipelines.registration.registration_colored_icp(
@@ -117,21 +116,32 @@ class GenericObjectTracker(ObjectTracker):
                                                                 relative_rmse=1e-6,
                                                                 max_iteration=self.no_iterations))
         except(RuntimeError):
-            return self._rotationMatrixToEulerAngles(self.previous_matrix), pc.get_center()
-            # return self.previous_matrix, pc.get_center()
+            # If there is an error with the ICP then return the previous values
+            return self._rotationMatrixToQuaternion(self.previous_matrix), self.previous_centre
 
         # Add the new point cloud to the original if there is enough overlap but not too much
         if (result_icp.inlier_rmse > 0.08 and result_icp.inlier_rmse < 0.18 and result_icp.fitness > 0.95):
             self._addToOriginalPointCloud(pc, result_icp.transformation)
 
         self.previous_matrix, self.previous_centre = result_icp.transformation, pc.get_center()
-        return self._rotationMatrixToEulerAngles(result_icp.transformation), pc.get_center()
-        # return result_icp.transformation, pc.get_center()
+        return self._rotationMatrixToQuaternion(result_icp.transformation), pc.get_center()
 
+    # Track the object for a frame
+    def _trackFrame(self, img):
+        new_box = self.tracker.update(img)
+
+        if (len(new_box) == 4):
+            rotation, centre = self._getTranslationRotationMatrix(new_box)
+            self.previous_rotation = rotation
+            return rotation, centre
+        else:
+            return self.previous_rotation, self.previous_centre
+        
     def startTracking(self):
         while True:
             # Start timer for fps calculation
             timer = cv2.getTickCount()
+            # Read image
             try:
                 img = self.camera.read()
             except:
@@ -140,12 +150,8 @@ class GenericObjectTracker(ObjectTracker):
 
             # Only track object if a bounding box has been selected
             if (len(self.box) == 4):
-                new_box = self.tracker.update(img)
-
-                if (len( new_box) == 4):
-                    rotation, centre = self._getTranslationRotationMatrix(new_box)
-                    self.sendData(rotation, centre)
-                
+                rotation, centre = self._trackFrame(img)
+                self.sendData(rotation, centre)
                 tracker.drawBox(img)
 
             # Calcuale fps and display
@@ -158,17 +164,11 @@ class GenericObjectTracker(ObjectTracker):
             k = cv2.waitKey(1)
             if k & 0xFF == ord('q'):
                 break
-            elif k & 0xFF == ord('d') :
+            # press s to start the tracking
+            elif k  == ord('s') :
                 print("Captureing box")
                 self._startTrackingBox()
-            elif k & 0xFF == ord('s'):
-                print("saving image")
-                try:
-                    o3d.io.write_point_cloud("./images/pc" + str(self.save)+".ply", self.camera.getPointCloud(new_box, self.tracker.getMask(), self.colour))
-                except(UnboundLocalError):
-                    print("PROBLEM SAVING")    
-                cv2.imwrite("./images/pc" + str(self.save)+".png", img)
-                self.save += 1
+            # press o to save the reference pointcloud
             elif k & 0xFF == ord('o'):
                 try:
                     print("saving original point cloud")
@@ -213,7 +213,6 @@ class GenericObjectTracker(ObjectTracker):
         self.camera.stop()
         speed_file.write("\n\n")
         translation_rotation.write("\n\n")
-
 
 
 if __name__ == "__main__":

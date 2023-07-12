@@ -66,7 +66,12 @@ class ReflectorTrack(ObjectTracker):
         self.no_iterations = no_iterations
         self.save = 0
 
-        
+        self.points = None
+        self.polygon = None
+        self.bounding_box = None
+        self.previous_rotation = np.array([0,0,0])
+        self.previous_centre = np.array([0,0,0])
+       
     def _movingAverage(self, new_value):
         if len(self.moving_average_rotation) >= self.moving_average_length:
             self.moving_average_rotation.pop(0)
@@ -82,15 +87,9 @@ class ReflectorTrack(ObjectTracker):
 
         return np.sum(np.asarray(self.moving_average_rotation) * self.moving_average_weights.reshape(-1, 1)[:len(self.moving_average_rotation)], axis=0) / np.sum(self.moving_average_weights)
 
-    
-    def _radToDeg(self, rad):
-        return rad * 180 / pi
-
     def _getPolygon(self, ir):
-        ir_thresholded = np.asarray(ir[:, :] > 20000, dtype=np.uint8) * 255
-        ir_thresholded = cv2.erode(ir_thresholded, np.ones((3,3), np.uint8), iterations=1)
-        
-        points = self.detector.detect(ir_thresholded)
+        ir = cv2.erode(ir, np.ones((3,3), np.uint8), iterations=1)
+        points = self.detector.detect(ir)
         
         xys = []
         # Add points on the perimeter of the circle
@@ -108,11 +107,6 @@ class ReflectorTrack(ObjectTracker):
             polygon = np.array([], dtype=np.int32)
             
         return points, polygon
-
-    def _rotationMatrixToEulerAngles(self, rotation) :
-        r_x,r_y,r_z = atan2(rotation[2,1], rotation[2,2]), atan2(-rotation[2,0], sqrt(rotation[2,1]**2 + rotation[2,2]**2)), atan2(rotation[1,0], rotation[0,0])
-        r_x,r_y,r_z = r_x*180/pi, r_y*180/pi, r_z*180/pi
-        return np.array([r_x, r_y, r_z])
 
     def _addToOriginalPointCloud(self, pcd, transform):
         if not pcd.has_normals():
@@ -146,7 +140,7 @@ class ReflectorTrack(ObjectTracker):
         pc = self.camera.getPointCloud(bbox, mask, self.colour)
 
         if (np.asarray(pc.points).shape[0] == 0):
-            return self._rotationMatrixToEulerAngles(self.previous_matrix), self.previous_centre
+            return self._rotationMatrixToQuaternion(self.previous_matrix), self.previous_centre
             # return self.previous_matrix, self.previous_centre
 
         # Perform ICP on the originaly generated point cloud and the new one
@@ -166,7 +160,7 @@ class ReflectorTrack(ObjectTracker):
                                                                 relative_rmse=1e-6,
                                                                 max_iteration=self.no_iterations))
         except(RuntimeError):
-            return self._rotationMatrixToEulerAngles(self.previous_matrix), pc.get_center()
+            return self._rotationMatrixToQuaternion(self.previous_matrix), pc.get_center()
             # return self.previous_matrix, pc.get_center()
         print(result_icp.inlier_rmse, result_icp.fitness )
         # Add the new point cloud to the original if there is enough overlap but not too much
@@ -175,13 +169,50 @@ class ReflectorTrack(ObjectTracker):
             self._addToOriginalPointCloud(pc, result_icp.transformation)
 
         self.previous_matrix, self.previous_centre = result_icp.transformation, pc.get_center()
-        return self._rotationMatrixToEulerAngles(result_icp.transformation), pc.get_center()
+        return self._rotationMatrixToQuaternion(result_icp.transformation), pc.get_center()
         # return result_icp.transformation, pc.get_center()
 
-
-    def startTracking(self):
-        started = False
+    def _drawPolygon(self, img): 
+        if len(img.shape) > 2:
+            img = self.camera.capture.transformed_color.copy()
         
+        if len(self.polygon) > 2:
+            cv2.fillPoly(img, [self.polygon], (255,0,0))
+            cv2.rectangle(img, (self.bounding_box[0],self.bounding_box[1]), (self.bounding_box[2]+self.bounding_box[0], self.bounding_box[3]+self.bounding_box[1]), (0,255,0))
+        cv2.drawKeypoints(img, self.points, img, (0,0,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+        return img
+
+    def _trackFrame(self, img):
+        self.points, self.polygon = self._getPolygon(img)
+    
+        if self.polygon.shape[0] > 0:
+            min_loc = self.polygon.argmin(axis = 0)
+            max_loc = self.polygon.argmax(axis = 0)
+            
+            self.bounding_box = np.array([self.polygon[min_loc[0], 0], 
+                self.polygon[min_loc[1], 1],
+                self.polygon[max_loc[0], 0]-self.polygon[min_loc[0], 0], 
+                self.polygon[max_loc[1], 1]-self.polygon[min_loc[1], 1] ])
+            
+            mask = np.zeros(img.shape, dtype=np.uint8)
+            cv2.fillPoly(mask, [self.polygon], (255, 255, 255)) 
+            mask = mask // 255
+
+            if (len(self.original_point_cloud.points) > 0):
+                rotation, centre = self._getTranslationRotationMatrix(mask, self.bounding_box)
+                self.previous_rotation, self.previous_centre = rotation, centre
+                return self.previous_rotation, self.previous_centre
+            else:
+                self._addToOriginalPointCloud(self.camera.getPointCloud(self.bounding_box, mask, self.colour), np.identity(4))
+                self.previous_centre = self.original_point_cloud.get_center()
+                return self.previous_rotation, self.previous_centre
+        else:
+            print("Could not read point cloud")
+            return self.previous_rotation, self.previous_centre
+
+    def startTracking(self):  
+        start = False      
         while True:
             # Start timer for fps calculation
             timer = cv2.getTickCount()
@@ -192,52 +223,20 @@ class ReflectorTrack(ObjectTracker):
                 print("Can't read image from camera")
                 break
 
-            points, polygon = self._getPolygon(ir)
-        
-            if polygon.shape[0] > 0:
-                min_loc = polygon.argmin(axis = 0)
-                max_loc = polygon.argmax(axis = 0)
-                
-                bounding_box = np.array([polygon[min_loc[0], 0], 
-                    polygon[min_loc[1], 1],
-                    polygon[max_loc[0], 0]-polygon[min_loc[0], 0], 
-                    polygon[max_loc[1], 1]-polygon[min_loc[1], 1] ])
-                
-                mask = np.zeros(ir.shape, dtype=np.uint8)
-                cv2.fillPoly(mask, [polygon], (255, 255, 255)) 
-                mask = mask // 255
-
-                self.colour = True
-
-                if not started:
-                    self._addToOriginalPointCloud(self.camera.getPointCloud(bounding_box, mask, self.colour), np.identity(4))
-                    started = True
-                else:
-                    rotation, centre = self._getTranslationRotationMatrix(mask, bounding_box)
-                    self.sendData(rotation, centre)
-
-
-                
-
-            # img_polygon = np.array([self.camera.k4a.calibration.convert_2d_to_3d([poly[0],poly[1]], 1, CalibrationType.DEPTH, CalibrationType.COLOR) for poly in polygon], dtype=np.int32)
-            # img_polygon = np.delete(img_polygon, 2, 1)      
-            # NEED TO WORK OUT HOW TO TRANSFROM FROM IR TO COLOUR FOR POINT CLOUD !!!!!!!!!!!!!!!!      
-
-
-            # ir_colour = np.array([ir_thresholded, ir_thresholded, ir_thresholded], dtype=np.uint8).transpose(1,2,0)
-            # ir_colour = ir_colour.copy()
+            ir_thresholded = np.asarray(ir[:, :] > 20000, dtype=np.uint8) * 255
             ir_colour = self.camera.capture.transformed_color.copy()
             
-            if len(polygon) > 2:
-                cv2.fillPoly(ir_colour, [polygon], (255,0,0))
-                cv2.rectangle(ir_colour, (bounding_box[0],bounding_box[1]), (bounding_box[2]+bounding_box[0], bounding_box[3]+bounding_box[1]), (0,255,0))
-            cv2.drawKeypoints(ir_colour, points, ir_colour, (0,0,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+            if start:
+                rotation, translation = self._trackFrame(ir_thresholded) 
+                self.sendData(rotation, translation)
+                ir_colour = self._drawPolygon(ir_colour)
+
 
             # Calcuale fps and display
             fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
-            cv2.putText(ir_colour, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            cv2.flip(ir_colour, 1)
-            cv2.imshow("tracking", ir_colour)
+            flip = cv2.flip(ir_colour, 1)
+            flip = cv2.putText(flip, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            cv2.imshow("tracking", flip)
             # cv2.imshow("mask", mask * 255)
 
             # Press q to quit
@@ -247,18 +246,13 @@ class ReflectorTrack(ObjectTracker):
             elif k & 0xFF == ord('o'):
                 try:
                     print("saving original point cloud")
-                    # o3d.visualization.draw_geometries([self.original_point_cloud])
                     o3d.io.write_point_cloud("./images/original.ply", self.original_point_cloud)
                 except(UnboundLocalError):
                     print("PROBLEM SAVING") 
-            elif k & 0xFF == ord('s'):
-                try:
-                    print("saving point cloud")
-                    # o3d.visualization.draw_geometries([self.original_point_cloud])
-                    o3d.io.write_point_cloud("./images/pc" + self.save + ".ply", self.camera.getPointCloud(bounding_box, mask, self.colour))
-                    self.save += 1
-                except(UnboundLocalError):
-                    print("PROBLEM SAVING") 
+            elif k == ord('s'):
+                self.original_point_cloud = o3d.geometry.PointCloud()
+                start = not start
+
             
         self.camera.stop()
 
@@ -291,7 +285,7 @@ if __name__ == "__main__":
         camera = AzureKinectCamera(transformed = False, voxel_size=0.03, min_standard_deviation=1, point_cloud_threshold=2000)
     
    
-    objectTracker = ReflectorTrack(sock, camera, ip=args.ip, port=args.port, voxel_size=0.05, no_iterations=30)
+    objectTracker = ReflectorTrack(sock, camera, ip=args.ip, port=args.port, voxel_size=0.05, no_iterations=30, colour=True)
 
     objectTracker.startTracking()
     
