@@ -64,12 +64,11 @@ class ReflectorTrack(ObjectTracker):
         self.voxel_size = voxel_size
         self.colour = colour
         self.no_iterations = no_iterations
-        self.save = 0
 
         self.points = None
         self.polygon = None
         self.bounding_box = None
-        self.previous_rotation = np.array([0,0,0])
+        self.previous_rotation = np.array([0,0,0,0])
         self.previous_centre = np.array([0,0,0])
        
     def _movingAverage(self, new_value):
@@ -88,7 +87,9 @@ class ReflectorTrack(ObjectTracker):
         return np.sum(np.asarray(self.moving_average_rotation) * self.moving_average_weights.reshape(-1, 1)[:len(self.moving_average_rotation)], axis=0) / np.sum(self.moving_average_weights)
 
     def _getPolygon(self, ir):
+        # make all the reflector points smaller (erode them) to differentiate them better
         ir = cv2.erode(ir, np.ones((3,3), np.uint8), iterations=1)
+        # Detect the points
         points = self.detector.detect(ir)
         
         xys = []
@@ -99,6 +100,7 @@ class ReflectorTrack(ObjectTracker):
                 x, y = p.pt
                 xys.append((x + p.size * cos(i), y + p.size *sin(i)))
         
+        # Only perform the alpha shape algorithm (convex hull algorithm) if there are enough data points to produce a polygon
         if len(xys) > 2:
             alpha_shape = alphashape.alphashape(xys, 0.0)
             polygon = alpha_shape.exterior.coords
@@ -108,12 +110,15 @@ class ReflectorTrack(ObjectTracker):
             
         return points, polygon
 
+    # Add a new point cloud to the reference point cloud
     def _addToOriginalPointCloud(self, pcd, transform):
+        # As I am using point to plane for the refining both point clouds must have normals
         if not pcd.has_normals():
             pcd.estimate_normals(
                 o3d.geometry.KDTreeSearchParamHybrid(radius=self.voxel_size * 2, max_nn=30))
-
-        if (np.asarray(self.original_point_cloud.points).shape[0] > 0):
+        # Only refine the translation and rotation if the reference point cloud has points in it
+        if (len(self.original_point_cloud.points) > 0):
+            # further refine the point cloud using point to plane and robust kernels
             loss = o3d.pipelines.registration.TukeyLoss(k=0.1)
             p2l = o3d.pipelines.registration.TransformationEstimationPointToPlane(loss)
             result_icp = o3d.pipelines.registration.registration_icp(pcd, self.original_point_cloud, 0.1, transform,
@@ -132,18 +137,16 @@ class ReflectorTrack(ObjectTracker):
                     o3d.geometry.KDTreeSearchParamHybrid(radius=self.voxel_size * 2, max_nn=30))
 
         print("Adding POINT CLOUD ", np.asarray(self.original_point_cloud.points).shape[0])
-        o3d.io.write_point_cloud("./images/pc" + str(self.save)+".ply", self.original_point_cloud)
-        self.save += 1
 
     def _getTranslationRotationMatrix(self, mask, bbox):
         # Get PointCloud
         pc = self.camera.getPointCloud(bbox, mask, self.colour)
 
-        if (np.asarray(pc.points).shape[0] == 0):
+        # If the point cloud has not got any points then don't perform ICP on it
+        if (len(pc.points) == 0):
             return self._rotationMatrixToQuaternion(self.previous_matrix), self.previous_centre
-            # return self.previous_matrix, self.previous_centre
 
-        # Perform ICP on the originaly generated point cloud and the new one
+        # Perform either ICP or coloured ICP between the reference point cloud and the new one
         try:
             if (self.colour):
                 result_icp = o3d.pipelines.registration.registration_colored_icp(
@@ -160,9 +163,9 @@ class ReflectorTrack(ObjectTracker):
                                                                 relative_rmse=1e-6,
                                                                 max_iteration=self.no_iterations))
         except(RuntimeError):
+            # If there is an error with the ICP then return the previous values
             return self._rotationMatrixToQuaternion(self.previous_matrix), pc.get_center()
-            # return self.previous_matrix, pc.get_center()
-        print(result_icp.inlier_rmse, result_icp.fitness )
+            
         # Add the new point cloud to the original if there is enough overlap but not too much
         if (result_icp.inlier_rmse > 0.055 and result_icp.inlier_rmse < 0.3 and result_icp.fitness > 0.95):
         
@@ -170,8 +173,8 @@ class ReflectorTrack(ObjectTracker):
 
         self.previous_matrix, self.previous_centre = result_icp.transformation, pc.get_center()
         return self._rotationMatrixToQuaternion(result_icp.transformation), pc.get_center()
-        # return result_icp.transformation, pc.get_center()
 
+    # Add all detected points, bounding box and polygon to the image
     def _drawPolygon(self, img): 
         if len(img.shape) > 2:
             img = self.camera.capture.transformed_color.copy()
@@ -186,19 +189,23 @@ class ReflectorTrack(ObjectTracker):
     def _trackFrame(self, img):
         self.points, self.polygon = self._getPolygon(img)
     
+        # If the detected polygon has corners (does exist)
         if self.polygon.shape[0] > 0:
+            # Calculate the minimum and maximum pixel coordinate of the polygon in order to draw a bounding box
             min_loc = self.polygon.argmin(axis = 0)
             max_loc = self.polygon.argmax(axis = 0)
-            
+
             self.bounding_box = np.array([self.polygon[min_loc[0], 0], 
                 self.polygon[min_loc[1], 1],
                 self.polygon[max_loc[0], 0]-self.polygon[min_loc[0], 0], 
                 self.polygon[max_loc[1], 1]-self.polygon[min_loc[1], 1] ])
             
+            # Create a mask by setting all points insise the polygon to 1 and everything else to 0
             mask = np.zeros(img.shape, dtype=np.uint8)
             cv2.fillPoly(mask, [self.polygon], (255, 255, 255)) 
             mask = mask // 255
 
+            # if the reference point cloud has been initialised then perform ICP otherwise create the reference pointcloud
             if (len(self.original_point_cloud.points) > 0):
                 rotation, centre = self._getTranslationRotationMatrix(mask, self.bounding_box)
                 self.previous_rotation, self.previous_centre = rotation, centre
@@ -216,15 +223,18 @@ class ReflectorTrack(ObjectTracker):
         while True:
             # Start timer for fps calculation
             timer = cv2.getTickCount()
+            # Read the ir image 
             try:
                 img = self.camera.read()
-                ir = self.camera.getIRimage()
+                ir = self.camera.getIRimage().copy()
+
+                # Threshold the image so that only the reflectors are visible
+                ir_thresholded = np.asarray(ir[:, :] > 20000, dtype=np.uint8) * 255
+                # turn the image into a colour image by repeating the thresholded image 3 times
+                ir_colour = np.array([ir_thresholded, ir_thresholded, ir_thresholded], dtype=np.uint8).transpose(1,2,0).copy()
             except:
                 print("Can't read image from camera")
                 break
-
-            ir_thresholded = np.asarray(ir[:, :] > 20000, dtype=np.uint8) * 255
-            ir_colour = self.camera.capture.transformed_color.copy()
             
             if start:
                 rotation, translation = self._trackFrame(ir_thresholded) 

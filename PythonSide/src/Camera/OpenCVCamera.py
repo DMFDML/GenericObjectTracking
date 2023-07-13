@@ -14,42 +14,21 @@ class OpenCVCamera(Camera):
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         self.calibration_files = calibration_files
 
-        
-    
     def read(self):
-        # Output a new image from the camera
-        # Input: None
-        # Output: An np.array() containing the rgb image data
         _, img = self.cap.read()
         return img
 
     def getDepthimage(self):
-        # Output the Depth image from the camera
-        # Input: None
-        # Output: An np.array() containing the Depth image data
-        pass
+        raise NotImplementedError
         
     def getIRimage(self):
-        # Output the IR image from the camera
-        # Input: None
-        # Output: An np.array() containing the IR image data
-        pass
+        raise NotImplementedError
 
-    
     def getPointCloud(self, bbox, mask = np.array([])):
-        # return an open3d pointcloud of just the tracked object
-        # Input: The bounding box for the image, Optional the mask of the object
-        # Output: None
-        #
-        pass
-
+        raise NotImplementedError
 
     def stop(self):
-        # Stop the camera
-        # Input: None
-        # Output: None
         self.cap.release()
-
 
     def get_calibration(self, checkerBoard = CHECKERBOARD):
         # returns the intrinsic calibration matrix of the camera
@@ -128,4 +107,4 @@ class OpenCVCamera(Camera):
         return matrix, distortion
 
     def twoDto3D(self, input2D):
-        return [0,0,0]
+        raise NotImplementedError

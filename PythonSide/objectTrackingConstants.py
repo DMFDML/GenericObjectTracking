@@ -17,7 +17,7 @@ UDP_IP = "127.0.0.1"
 UDP_PORT = 5065
 
 # The conversion between camera space to world space, opencv and azure kinect use mm but unity uses m so have to convert between!!
-DISTANCE_CONVERSION = 1000
+DISTANCE_CONVERSION = 100
 
 # Aruco Constants
 ARUCO_TYPE = "DICT_4X4_50"

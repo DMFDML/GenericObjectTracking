@@ -55,7 +55,6 @@ class ArucoTracker(ObjectTracker):
         return np.mean(np.array(self.moving_average_rotation), axis=0)
 
     def _aruco_display(self, corners, ids, rvecs, tvecs,image, colour=(0, 0, 255)):
-        
         if len(corners) > 0:
             
             ids = ids.flatten()
@@ -64,24 +63,24 @@ class ArucoTracker(ObjectTracker):
                 
                 corners = markerCorner.reshape((4, 2))
                 (topLeft, topRight, bottomRight, bottomLeft) = corners
-                
+                # calculate the corners of the aruco
                 topRight = (int(topRight[0]), int(topRight[1]))
                 bottomRight = (int(bottomRight[0]), int(bottomRight[1]))
                 bottomLeft = (int(bottomLeft[0]), int(bottomLeft[1]))
                 topLeft = (int(topLeft[0]), int(topLeft[1]))
-
+                # draw box around the corners
                 cv2.line(image, topLeft, topRight, colour, 2)
                 cv2.line(image, topRight, bottomRight, colour, 2)
                 cv2.line(image, bottomRight, bottomLeft, colour, 2)
                 cv2.line(image, bottomLeft, topLeft, colour, 2)
-                
+                # draw top corner of the aruco
                 cX = int((topLeft[0] + bottomRight[0]) / 2.0)
                 cY = int((topLeft[1] + bottomRight[1]) / 2.0)
                 cv2.circle(image, (cX, cY), 4, (0, 0, 255), -1)
-                
+                # draw id of the aruco
                 cv2.putText(image, str(markerID),(topLeft[0], topLeft[1] - 10), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (0, 255, 0), 2)
-                # print("[Inference] ArUco marker ID: {}".format(markerID))
+                # draw pose of the aruco
                 cv2.drawFrameAxes(image, self.intrinsic, self.distortion, rvec, tvec, self.marker_size)  
                 
         return image

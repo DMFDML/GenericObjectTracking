@@ -98,7 +98,6 @@ class GenericObjectTracker(ObjectTracker):
         if (len(pc.points) == 0):
             return self._rotationMatrixToQuaternion(self.previous_matrix), self.previous_centre
         
-
         # Perform either ICP or coloured ICP between the reference point cloud and the new one
         try:
             if (self.colour):
