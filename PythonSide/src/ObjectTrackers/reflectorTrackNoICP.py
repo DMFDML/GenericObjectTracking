@@ -1,16 +1,16 @@
 import sys
-# sys.path.append("./sort_oh")
+sys.path.append('./src/')
 import numpy as np
 import cv2
 import time
-from objectTrackingConstants import *
+from Util.objectTrackingConstants import *
 import socket
 
 from math import atan2, cos, acos, sin, sqrt, pi, asin
-from src.Camera.AzureKinect import AzureKinectCamera
-from src.Camera.FakeCamera import FakeCamera
+from Camera.AzureKinect import AzureKinectCamera
+from Camera.FakeCamera import FakeCamera
 import argparse
-from ObjectTrackerInterface import ObjectTracker
+from ObjectTrackers.ObjectTrackerInterface import ObjectTracker
 import alphashape
 from pyk4a import CalibrationType
 import open3d as o3d
@@ -23,6 +23,7 @@ from mpl_toolkits.mplot3d import Axes3D
 class ReflectorTrackNoICP(ObjectTracker):
 
     def __init__(self, sock, camera, ip=UDP_IP, port=UDP_PORT):
+        self.name = "ReflectorTrackerNoICP"
         self.camera = camera
 
         self.sock = sock
@@ -211,7 +212,9 @@ class ReflectorTrackNoICP(ObjectTracker):
         pitch = asin(-normal[1])
         yaw = atan2(normal[0], normal[2])
 
-        return self._radToDeg(np.array([pitch, yaw, roll]))        
+        quaternion = self._multiplyQuaternions([1/tan(pitch), 1,0,0], [1/tan(yaw), 0,1,0])
+        quaternion = quaternion / np.linalg.norm(quaternion)
+        return quaternion        
 
     def _drawPoints(self, img, points):
         for c in points:
@@ -224,7 +227,7 @@ class ReflectorTrackNoICP(ObjectTracker):
         return img
                 
 
-    def _trackFrame(self, img, depth):
+    def trackFrame(self, img, depth):
         # Calculate all reflectors within the frame
         self.points = self._getPointsAndClusters(img, depth)
 
@@ -235,11 +238,8 @@ class ReflectorTrackNoICP(ObjectTracker):
             centre = self._getCentre(self.points)
             # Calculate the average euler angle of the normal for all the planes 
             rotation = self._getRotation(planes, centre_plane)
-
-            if self.initial_rotation is None:
-                self.initial_rotation = rotation.copy()
             
-            self.previous_rotation, self.previous_centre = (rotation - self.initial_rotation, self.camera.twoDto3D((int(centre[0]), int(centre[1]))))
+            self.previous_rotation, self.previous_centre = (rotation, self.camera.twoDto3D((int(centre[0]), int(centre[1]))))
             return self.previous_rotation, self.previous_centre
         else:
             return self.previous_rotation, self.previous_centre
@@ -253,7 +253,7 @@ class ReflectorTrackNoICP(ObjectTracker):
                 img = self.camera.read()
                 ir = self.camera.getIRimage().copy()
                 depth = self.camera.getDepthimage().copy()
-                
+
                 # Threshold the image so that only the reflectors are visible
                 ir_thresholded = np.asarray(ir[:, :] > 20000, dtype=np.uint8) * 255
                 # turn the image into a colour image by repeating the thresholded image 3 times
@@ -264,7 +264,7 @@ class ReflectorTrackNoICP(ObjectTracker):
             ir_colour = np.array([ir_thresholded, ir_thresholded, ir_thresholded], dtype=np.uint8).transpose(1,2,0).copy()
 
             if started:
-                rotation, centre = self._trackFrame(ir_thresholded, depth)
+                rotation, centre = self.trackFrame(ir_thresholded, depth)
                 self.sendData(rotation, centre) 
                 ir_colour = self._drawPoints(ir_colour, self.points)
 
@@ -303,15 +303,13 @@ class ReflectorTrackNoICP(ObjectTracker):
                 started = not started
         self.camera.stop()
 
-    def benchMark(self):
-        pass
 
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Retro-Reflector Object Tracking')
-    parser.add_argument('--ip', dest='ip', default=UDP_IP,
+    parser.add_argument('--ip', dest='ip', default=UDP_IP, 
                     help='IP address of the computer to send data to')
-    parser.add_argument('--port', dest='port', default=UDP_PORT,
+    parser.add_argument('--port', dest='port', default=UDP_PORT, type=int,
                     help='Port of the computer to send data to')
     parser.add_argument('--isCamera', dest='isCamera', default=FAKE_CAMERA, type=bool,
                     help='If a camera is being used or not')
@@ -322,14 +320,7 @@ if __name__ == "__main__":
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-
-    if args.isCamera:
-        if args.videoPath is None:
-            camera = FakeCamera()
-        else:
-            camera = FakeCamera(videoPath=args.videoPath)
-    else:
-        camera = AzureKinectCamera(transformed = False, voxel_size=0.025)
+    camera = AzureKinectCamera(transformed = False, voxel_size=0.025)
     
     objectTracker = ReflectorTrackNoICP(sock, camera, ip=args.ip, port=args.port)
 

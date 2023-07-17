@@ -1,16 +1,16 @@
 import sys
-# sys.path.append("./sort_oh")
+sys.path.append('./src/')
 import numpy as np
 import cv2
 import time
-from objectTrackingConstants import *
+from Util.objectTrackingConstants import *
 import socket
 
 from math import atan2, cos, sin, sqrt, pi
-from src.Camera.AzureKinect import AzureKinectCamera
-from src.Camera.FakeCamera import FakeCamera
+from Camera.AzureKinect import AzureKinectCamera
+from Camera.FakeCamera import FakeCamera
 import argparse
-from ObjectTrackerInterface import ObjectTracker
+from ObjectTrackers.ObjectTrackerInterface import ObjectTracker
 import alphashape
 from pyk4a import CalibrationType
 import open3d as o3d
@@ -20,6 +20,7 @@ import open3d as o3d
 class ReflectorTrack(ObjectTracker):
 
     def __init__(self, sock, camera, ip=UDP_IP, port=UDP_PORT, voxel_size = VOXEL_SIZE, colour = COLOUR, no_iterations = NO_ITERATIONS):
+        self.name = "ReflectorTracker"
         self.camera = camera
 
         self.sock = sock
@@ -175,20 +176,17 @@ class ReflectorTrack(ObjectTracker):
         return self._rotationMatrixToQuaternion(result_icp.transformation), pc.get_center()
 
     # Add all detected points, bounding box and polygon to the image
-    def _drawPolygon(self, img): 
-        if len(img.shape) > 2:
-            img = self.camera.capture.transformed_color.copy()
-        
+    def _drawPolygon(self, img):         
         if len(self.polygon) > 2:
             cv2.fillPoly(img, [self.polygon], (255,0,0))
-            cv2.rectangle(img, (self.bounding_box[0],self.bounding_box[1]), (self.bounding_box[2]+self.bounding_box[0], self.bounding_box[3]+self.bounding_box[1]), (0,255,0))
+            # cv2.rectangle(img, (self.bounding_box[0],self.bounding_box[1]), (self.bounding_box[2]+self.bounding_box[0], self.bounding_box[3]+self.bounding_box[1]), (0,255,0))
         cv2.drawKeypoints(img, self.points, img, (0,0,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
         return img
 
-    def _trackFrame(self, img):
+    def trackFrame(self, img):
         self.points, self.polygon = self._getPolygon(img)
-    
+
         # If the detected polygon has corners (does exist)
         if self.polygon.shape[0] > 0:
             # Calculate the minimum and maximum pixel coordinate of the polygon in order to draw a bounding box
@@ -215,7 +213,7 @@ class ReflectorTrack(ObjectTracker):
                 self.previous_centre = self.original_point_cloud.get_center()
                 return self.previous_rotation, self.previous_centre
         else:
-            print("Could not read point cloud")
+            print("Could not read polygon")
             return self.previous_rotation, self.previous_centre
 
     def startTracking(self):  
@@ -237,7 +235,7 @@ class ReflectorTrack(ObjectTracker):
                 break
             
             if start:
-                rotation, translation = self._trackFrame(ir_thresholded) 
+                rotation, translation = self.trackFrame(ir_thresholded) 
                 self.sendData(rotation, translation)
                 ir_colour = self._drawPolygon(ir_colour)
 
@@ -266,33 +264,21 @@ class ReflectorTrack(ObjectTracker):
             
         self.camera.stop()
 
-    def benchMark(self):
-        pass
 
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Retro-Reflector Object Tracking')
-    parser.add_argument('--ip', dest='ip', default=UDP_IP,
+    parser.add_argument('--ip', dest='ip', default=UDP_IP, 
                     help='IP address of the computer to send data to')
-    parser.add_argument('--port', dest='port', default=UDP_PORT,
+    parser.add_argument('--port', dest='port', default=UDP_PORT, type=int,
                     help='Port of the computer to send data to')
-    parser.add_argument('--isCamera', dest='isCamera', default=FAKE_CAMERA, type=bool,
-                    help='If a camera is being used or not')
-    parser.add_argument('--videoPath', dest='videoPath', default=None,
-                    help='The path to the images being used')
 
     args = parser.parse_args()
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 
-    if args.isCamera:
-        if args.videoPath is None:
-            camera = FakeCamera()
-        else:
-            camera = FakeCamera(videoPath=args.videoPath)
-    else:
-        camera = AzureKinectCamera(transformed = False, voxel_size=0.03, min_standard_deviation=1, point_cloud_threshold=2000)
+    camera = AzureKinectCamera(transformed = False, voxel_size=0.03, min_standard_deviation=1, point_cloud_threshold=2000)
     
    
     objectTracker = ReflectorTrack(sock, camera, ip=args.ip, port=args.port, voxel_size=0.05, no_iterations=30, colour=True)

@@ -1,25 +1,26 @@
+
 import sys
-# sys.path.append("./sort_oh")
+sys.path.append('./src/')
 import numpy as np
 import cv2
 import time
-from objectTrackingConstants import *
+from Util.objectTrackingConstants import *
 import socket
 
 from math import atan2, cos, sin, sqrt, pi
-from src.Camera.AzureKinect import AzureKinectCamera
-from src.Camera.FakeCamera import FakeCamera
-from src.Camera.OpenCVCamera import OpenCVCamera
+from Camera.AzureKinect import AzureKinectCamera
+from Camera.FakeCamera import FakeCamera
+from Camera.OpenCVCamera import OpenCVCamera
 import argparse
-from ObjectTrackerInterface import ObjectTracker
+from ObjectTrackers.ObjectTrackerInterface import ObjectTracker
 import glob
-from objectTrackingConstants import DISTANCE_CONVERSION
     
 
 
 class ArucoTracker(ObjectTracker):
 
     def __init__(self, sock, camera, aruco_type, ip=UDP_IP, port=UDP_PORT, marker_size=40):
+        self.name = "ArucoTracker"
         self.camera = camera
         self.aruco_type = cv2.aruco.Dictionary_get(ARUCO_DICT[aruco_type])
         
@@ -41,7 +42,7 @@ class ArucoTracker(ObjectTracker):
         # self.moving_average_translation = [(0,0,0)]
         self.moving_average_length = 5
         self.moving_average_weights = np.array([0.2,0.2,0.4,0.4,0.6,0.6,0.8,0.8,1,1])
-        self.display_values = []
+        self.display_values = [[],[],[],[]]
 
         self.previous_rotation = np.array([0,0,0,0])
         self.previous_centre = np.array([0,0,0])
@@ -101,19 +102,21 @@ class ArucoTracker(ObjectTracker):
             r = cv2.Rodrigues(rvec)
             # Convert the rotation matrix to Euler values (should probably just use Quaternion)
             quaternion = self._rotationMatrixToQuaternion(r[0])
+            quaternion = self._multiplyQuaternions(ARUCO_ROTATION_OFFCET, quaternion)
             offcet = OFFCET_DICT.get(ids[i][0], {"translation": [0, 0, 0], "rotation": [0, 0, 0, 0]})
 
 
             # Add rotaiton and translation offcets to the angles depending on which aruco is being seen
             quaternion = self._multiplyQuaternions(offcet["rotation"], quaternion)
             centre = tvec + offcet['translation']
+            
 
             quaternions.append(quaternion)
             centres.append(centre)
 
         return rvecs, tvecs, quaternions, np.asarray(centres)
 
-    def _trackFrame(self, img):
+    def trackFrame(self, img):
         # Detect aruco markers
         (corners, ids, _) = cv2.aruco.detectMarkers(img, self.aruco_type, parameters=self.arucoParams)
         if len(corners) > 0:
@@ -124,14 +127,14 @@ class ArucoTracker(ObjectTracker):
 
             # moving_average_rvecs = self._moving_average(eulers[closest_aruco])
             self.display_values = [corners, ids, rvecs, tvecs]
-
-            # Send data, / 1000 is due to opencv working in mm and unity working in m
-            self.previous_rotation, self.previous_centre = (quaternions[closest_aruco], centre[closest_aruco] / DISTANCE_CONVERSION)
+            
+            # print(abs(quaternions[closest_aruco][0] - self.previous_rotation[0]))
+            # if (abs(quaternions[closest_aruco][0] - self.previous_rotation[0]) < SMALL_ANGLE_VALUE):
+                # Send data, / 1000 is due to opencv working in mm and unity working in m
+            self.previous_rotation, self.previous_centre = (quaternions[closest_aruco], centre[closest_aruco] / DISTANCE_CONVERSION_ARUCO)
             return self.previous_rotation, self.previous_centre
-        else:
-            return self.previous_rotation, self.previous_centre
-        
 
+        return self.previous_rotation, self.previous_centre
 
     def startTracking(self):
         started = False
@@ -145,7 +148,7 @@ class ArucoTracker(ObjectTracker):
                 break
 
             if started:
-                rotation, centre = self._trackFrame(img)
+                rotation, centre = self.trackFrame(img)
                 self.sendData(rotation, centre)
 
                 self._aruco_display(self.display_values[0],self.display_values[1],self.display_values[2],self.display_values[3], img)
@@ -171,44 +174,28 @@ class ArucoTracker(ObjectTracker):
                 started = not started
         self.camera.stop()
 
-    def benchMark(self):
-        pass
 
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Aruco Object Tracking')
     parser.add_argument('--t', dest='type', default=ARUCO_TYPE,
                     help='The type of aruco marker being used')
-    parser.add_argument('--ip', dest='ip', default=UDP_IP,
+    parser.add_argument('--ip', dest='ip', default=UDP_IP, 
                     help='IP address of the computer to send data to')
-    parser.add_argument('--port', dest='port', default=UDP_PORT,
+    parser.add_argument('--port', dest='port', default=UDP_PORT, type=int,
                     help='Port of the computer to send data to')
-    parser.add_argument('--isCamera', dest='isCamera', default=FAKE_CAMERA, type=bool,
-                    help='If a camera is being used or not')
-    parser.add_argument('--videoPath', dest='videoPath', default=None,
-                    help='The path to the images being used')
     parser.add_argument('--cameraid', dest='cameraid', type=int, default=0, help="The camera ID")
-    parser.add_argument('--calibration', dest='calibration', type=str, default='images\calibration\calibrate*.png', help="The path to images for camera calibration")
+    parser.add_argument('--calibration_image', dest='calibration_image', type=str, default='images\\calibration\\azureCalibrate*.png', help="The path to images for camera calibration")
+    parser.add_argument('--calibration_file', dest='calibration_file', type=str, default=None, help="The path to the calibration file")
     parser.add_argument('--marker', dest='marker', type = int,
                         default=400, help='The size of the aruco marker being used')
 
     args = parser.parse_args()
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-
-    if args.isCamera:
-        if args.videoPath is None:
-            camera = FakeCamera()
-        else:
-            camera = FakeCamera(videoPath=args.videoPath)
-    else:
-        # camera = AzureKinectCamera()
-        camera = OpenCVCamera(camera_id=args.cameraid, calibration_files=args.calibration)
-
-    
+    camera = OpenCVCamera(camera_id=args.cameraid, calibration_images=args.calibration_image, calibration_file=args.calibration_file)    
    
-    objectTracker = ArucoTracker(sock, camera, args.type, ip=args.ip, port=5064, marker_size=args.marker)
+    objectTracker = ArucoTracker(sock, camera, args.type, ip=args.ip, port=args.port, marker_size=args.marker)
 
     objectTracker.startTracking()
     

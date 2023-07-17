@@ -3,7 +3,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 import sys
 import os
 sys.path.append(os.getcwd() + './re3-tensorflow')
-from src.Trackers.TrackerInterface import Tracker
+from Trackers2D.TrackerInterface import Tracker
 from tracker import re3_tracker
 from re3_utils.util import drawing
 from re3_utils.util import bb_util
@@ -14,7 +14,7 @@ import cv2
 
 
 from constants import GPU_ID
-from objectTrackingConstants import PRE_TRAINED_MODEL_Re3
+from Util.objectTrackingConstants import PRE_TRAINED_MODEL_Re3
 
 
 

@@ -1,21 +1,24 @@
+import sys
+sys.path.append('./src/')
 import cv2
-from src.Trackers.SiamMask import SiamMaskSharpTracker
-from src.Trackers.Re3 import Re3Tracker
+from Trackers2D.SiamMask import SiamMaskSharpTracker
+from Trackers2D.Re3 import Re3Tracker
 import socket
 import json
 from math import atan2, cos, sin, sqrt, pi
 import numpy as np
-from src.Camera.AzureKinect import AzureKinectCamera
-from src.Camera.FakeCamera import FakeCamera
+from Camera.AzureKinect import AzureKinectCamera
+from Camera.FakeCamera import FakeCamera
 import open3d as o3d
 import time
 import argparse
-from ObjectTrackerInterface import ObjectTracker
+from ObjectTrackers.ObjectTrackerInterface import ObjectTracker
 
-from objectTrackingConstants import *
+from Util.objectTrackingConstants import *
 
 class GenericObjectTracker(ObjectTracker):
     def __init__(self, sock, tracker, camera, ip=UDP_IP, port=UDP_PORT, voxel_size = VOXEL_SIZE, colour = COLOUR, no_iterations = NO_ITERATIONS, box = []):
+        self.name = "GenericObjectTracker"
         self.tracker = tracker
 
         self.camera = camera
@@ -126,7 +129,7 @@ class GenericObjectTracker(ObjectTracker):
         return self._rotationMatrixToQuaternion(result_icp.transformation), pc.get_center()
 
     # Track the object for a frame
-    def _trackFrame(self, img):
+    def trackFrame(self, img):
         new_box = self.tracker.update(img)
 
         if (len(new_box) == 4):
@@ -149,7 +152,7 @@ class GenericObjectTracker(ObjectTracker):
 
             # Only track object if a bounding box has been selected
             if (len(self.box) == 4):
-                rotation, centre = self._trackFrame(img)
+                rotation, centre = self.trackFrame(img)
                 self.sendData(rotation, centre)
                 tracker.drawBox(img)
 
@@ -177,55 +180,16 @@ class GenericObjectTracker(ObjectTracker):
                     print("PROBLEM SAVING") 
         self.camera.stop()
 
-    def benchMark(self, speed_file, translation_rotation):
-        speed_file.write("Frame, Total FPS, Tracker Time, Translation Rotation Time\n")
-        translation_rotation.write("Frame, Rotation, Translation\n")
-        frame = 0
-        while True:
-            # Start timer for fps calculation
-            try:
-                img = self.camera.read()
-            except:
-                print("Out of Images")
-                break
-            
-            start = time.time()
-
-            # Only track object if a bounding box has been selected
-            if (not self.box == []):
-                tracker_start = time.time()
-                new_box = self.tracker.update(img)
-                tracker_end = time.time()
-                if (not new_box == []):
-                    rotation_start = time.time()
-                    rotation, centre = self._getTranslationRotationMatrix(new_box)
-                    
-                    # Calculate the fps and write to file
-                    speed_file.write(str(frame) + ", " + str(1/(time.time() - start)) + ", " + str(tracker_end - tracker_start) + ", " + str(time.time() - rotation_start) + ", \n")
-                    # Calculate the rotation and translation and send to file
-                    translation_rotation.write(str(frame) + ", " + str(rotation) + ", " + str(centre) + ", \n")
-
-            print("Processed Frame: " + str(frame))
-            frame += 1
-            
-
-        self.camera.stop()
-        speed_file.write("\n\n")
-        translation_rotation.write("\n\n")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generic Object Tracking')
     parser.add_argument('--tracker', dest='tracker', default=TRACKER,
                     help='Type of tracker being used')
-    parser.add_argument('--ip', dest='ip', default=UDP_IP,
+    parser.add_argument('--ip', dest='ip', default=UDP_IP, 
                     help='IP address of the computer to send data to')
-    parser.add_argument('--port', dest='port', default=UDP_PORT,
+    parser.add_argument('--port', dest='port', default=UDP_PORT, type=int,
                     help='Port of the computer to send data to')
-    parser.add_argument('--isCamera', dest='isCamera', default=FAKE_CAMERA, type=bool,
-                    help='If a camera is being used or not')
-    parser.add_argument('--videoPath', dest='videoPath', default=None,
-                    help='The path to the images being used')
     parser.add_argument('--voxel_size', dest='voxel_size', default=VOXEL_SIZE,
                     help='The size of the voxels being used')
     parser.add_argument('--colour', dest='colour', type=bool, default=COLOUR,
@@ -246,13 +210,8 @@ if __name__ == "__main__":
     else:
         raise ValueError("Invalid tracker type")
 
-    if args.isCamera:
-        if args.videoPath is None:
-            camera = FakeCamera(voxel_size=args.voxel_size)
-        else:
-            camera = FakeCamera(voxel_size=args.voxel_size, videoPath=args.videoPath)
-    else:
-        camera = AzureKinectCamera(voxel_size=args.voxel_size)
+
+    camera = AzureKinectCamera(voxel_size=args.voxel_size)
     
     if not tracker is None:
         objectTracker = GenericObjectTracker(sock, tracker, camera, ip=args.ip, port=args.port, voxel_size=args.voxel_size, colour=args.colour, no_iterations=args.no_iterations, box=args.box)

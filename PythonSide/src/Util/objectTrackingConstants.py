@@ -1,5 +1,6 @@
 from cv2 import aruco
-from math import pi
+from math import pi, cos,sin, tan
+from ObjectTrackers.ObjectTrackerInterface import ObjectTracker
 # SiamMask Constants
 CONFIG = './SiamMask/PreTrainedModels/config_VOT.json'
 PRE_TRAINED_MODEL_SiamMask = './SiamMask/PreTrainedModels/SiamMask_VOT.pth'
@@ -15,9 +16,12 @@ NO_ITERATIONS = 30
 FAKE_CAMERA = False
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5065
+AZURE_CALIBRATION = "./src/Camera/calibration_azure.json"
+OPENCV_CALIBRATION = "./src/Camera/calibration_opencv.json"
 
 # The conversion between camera space to world space, opencv and azure kinect use mm but unity uses m so have to convert between!!
-DISTANCE_CONVERSION = 100
+DISTANCE_CONVERSION_AZURE = 100
+DISTANCE_CONVERSION_ARUCO = 1000
 
 # Aruco Constants
 ARUCO_TYPE = "DICT_4X4_50"
@@ -45,42 +49,40 @@ ARUCO_DICT = {
 	"DICT_APRILTAG_36h11": aruco.DICT_APRILTAG_36h11
 }
 OFFCET_DICT = {
-    0: { # front
+    7: { # front, Piston 1
         "translation": [0, 0, 0],
-        "rotation": [0, 0, 0, 0]
+        "rotation": [cos(0.5 * 0), 0, sin(0.5 * 0), 0]
     },
-    1: { # back
+    11: { # back, Piston 2
         "translation": [0, 0, 0],
-        "rotation": [0, 0, 1, 0]
+        "rotation": [cos(0.5 * pi), 0, sin(0.5 * pi), 0]
     },
-    2: { # left
+    13: { # left, Piston 3
         "translation": [0, 0, 0],
-        "rotation": [0, 1, 0, 0]
+        "rotation": [cos(0.5 * -pi/2), 0, sin(0.5 * -pi/2), 0]
     },
-    3: { # right
+    6: { # right, Link 1 End
         "translation": [0, 0, 0],
-        "rotation": [0, -1, 0, 0]
+        "rotation": [cos(0.5 * pi/2), 0, sin(0.5 * pi/2), 0]
     },
-    4: { # top
+    10: { # top, Link 1 End
         "translation": [0, 0, 0],
-        "rotation": [0, 0, 0, 1]
+        "rotation": [cos(0.5 * -pi /2), sin(0.5 * -pi/2), 0, 0]
     },
-    6: { # bottom
+    12: { # bottom, Link 1 End
         "translation": [0, 0, 0],
-        "rotation": [0, 0, 0, 1]
+        "rotation": [cos(0.5 * pi /2), sin(0.5 * pi/2), 0,0]
     },
-    11: { # anotherOne
-        "translation": [0, 0, 0],
-        "rotation": [0, 0, 1, 0]
-    }
 
 }
+ARUCO_ROTATION_OFFCET = ObjectTracker._multiplyQuaternions(None, [cos(0.5 * pi), 0, sin(0.5 * pi), 0], [cos(0.5 * pi), 0, 0, sin(0.5 * pi)])
+# ARUCO_ROTATION_OFFCET = [1,0,0,0]
 
 CHECKERBOARD = (6,9)
+SMALL_ANGLE_VALUE = 1
 
 # Fake Camera Constants
-IMAGE_FILE_LOCATIONS = "../TestCode/images/"
+IMAGE_FILE_LOCATIONS = "./images/benchmark_images/"
 
 # Benchmark Constants
-TIME_FILE = "./benchmark/time.csv"
-TRANSLATION_FILE = "./benchmark/translation_rotation.csv"
+BENCHMARK_FILE = "./benchmark/benchmark_result"

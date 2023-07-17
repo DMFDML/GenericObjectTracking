@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.append(os.getcwd() + '/SiamMask')
 sys.path.append(os.getcwd() + '/SiamMask/experiments/siammask_sharp')
-from src.Trackers.TrackerInterface import Tracker
+from Trackers2D.TrackerInterface import Tracker
 from tools.test import *
 from custom import Custom
 from models.siammask_sharp import SiamMask
@@ -11,7 +11,7 @@ from utils.tracker_config import TrackerConfig
 import torch
 import torch.nn as nn
 import cv2
-from objectTrackingConstants import CONFIG, PRE_TRAINED_MODEL_SiamMask
+from Util.objectTrackingConstants import CONFIG, PRE_TRAINED_MODEL_SiamMask
 
 
 

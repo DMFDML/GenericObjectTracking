@@ -43,13 +43,12 @@ class ObjectTracker(ABC):
         return np.array([w, x, y, z])
 
     @abstractmethod
-    def _trackFrame(self, img):
+    def trackFrame(self, img):
         # start tracking the object
         # Input: img, The frame of the video being processed
         # Output: rotation, The rotation of the object
         #         translation, The translation of the object
         pass
-
 
     @abstractmethod
     def startTracking(self):
@@ -58,10 +57,3 @@ class ObjectTracker(ABC):
         # Output: None
         pass
 
-    @abstractmethod
-    def benchMark(self, speed_file, translation_rotation):
-        # benchmark the tracker
-        # Input: speed_file, The open file for frame rate data
-        #        translation_rotation, The open file for tranlation and rotation data
-        # Output: None
-        pass

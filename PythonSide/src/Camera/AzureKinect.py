@@ -4,9 +4,12 @@ import numpy as np
 import pyk4a
 from pyk4a import Config, PyK4A, Calibration, CalibrationType
 import open3d as o3d
-from src.Camera.Camera import Camera
+from Camera.Camera import Camera
 import copy
-from objectTrackingConstants import DISTANCE_CONVERSION
+from Util.objectTrackingConstants import DISTANCE_CONVERSION_AZURE
+import os
+import json
+from pathlib import Path
 
 
 class AzureKinectCamera(Camera):
@@ -66,7 +69,7 @@ class AzureKinectCamera(Camera):
             pc = pc[mask]
         
         # convert from mm to m as open3d didn't like the mm
-        pc = pc / DISTANCE_CONVERSION
+        pc = pc / DISTANCE_CONVERSION_AZURE
         for standard_deviation_factor in np.arange(self.min_standard_deviation, 3, 0.1):
             thresholded_pc = pc[(pc[:,2] < np.mean(pc[:,2]) + standard_deviation_factor* pc[:,2].std()) & (pc[:,2] > np.mean(pc[:,2]) - standard_deviation_factor* pc[:,2].std())]
             if(thresholded_pc.shape[0] > self.point_cloud_threshold):
@@ -92,7 +95,7 @@ class AzureKinectCamera(Camera):
             pc = pc[mask]
             colour = colour[mask]
         
-        pc = pc / DISTANCE_CONVERSION
+        pc = pc / DISTANCE_CONVERSION_AZURE
         colour = colour / 255
         for standard_deviation_factor in np.arange(self.min_standard_deviation, 3, 0.1):
             thresholded_pc = pc[(pc[:,2] < np.mean(pc[:,2]) + standard_deviation_factor* pc[:,2].std()) & (pc[:,2] > np.mean(pc[:,2]) - standard_deviation_factor* pc[:,2].std())]
@@ -126,6 +129,6 @@ class AzureKinectCamera(Camera):
         
         if self.transformed:
             # If the user wants the transformed depth point cloud or not
-            return self.capture.transformed_depth_point_cloud[coordinate[1]][coordinate[0]] / 100
+            return self.capture.transformed_depth_point_cloud[coordinate[1]][coordinate[0]] / DISTANCE_CONVERSION_AZURE
         else:
-            return self.capture.depth_point_cloud[coordinate[1]][coordinate[0]] / 100
+            return self.capture.depth_point_cloud[coordinate[1]][coordinate[0]] / DISTANCE_CONVERSION_AZURE

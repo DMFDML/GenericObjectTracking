@@ -6,16 +6,18 @@ from pyk4a import Config, PyK4A, Calibration, CalibrationType
 import open3d as o3d
 import json
 import imageio
+import time
 
 
 # Outputs the point cloud as a json file
-def outputPCImage(capture, no):
-    pc = capture.transformed_depth_point_cloud
-    colour = capture.color[:,:, :3]
+def outputPCImage(captures):
+    for no, capture in enumerate(captures):
+        pc = capture.transformed_depth_point_cloud
+        colour = capture.color[:,:, :3]
 
-    imageio.imwrite("images/pcds/pc" + str(no) + ".tif", pc)
-    imageio.imwrite("images/colours/colour" + str(no) + ".jpg", colour)
-    print("saved " + str(no))
+        imageio.imwrite("images/pcds/pc" + str(no) + ".tif", pc)
+        imageio.imwrite("images/colours/colour" + str(no) + ".jpg", colour)
+        print("saved " + str(no))
 
 def main():
 
@@ -37,13 +39,17 @@ def main():
     pcd = o3d.geometry.PointCloud()
 
     save = 1
+    captures = []
 
-    for i in range(100):
+    for i in range(90):
+        start = time.time()
         capture = k4a.get_capture()
         if np.any(capture.color) and np.any(capture.depth):
 
-            outputPCImage(capture, i)
+            captures.append(capture)
+        print(time.time() - start.time())
 
+    outputPCImage(captures)
 
     k4a.stop()
 

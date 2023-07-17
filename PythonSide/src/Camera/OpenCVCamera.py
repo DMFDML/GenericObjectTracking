@@ -1,18 +1,27 @@
 
 import numpy as np
-from src.Camera.Camera import Camera
+from Camera.Camera import Camera
 import cv2
-from objectTrackingConstants import CHECKERBOARD
+from Util.objectTrackingConstants import CHECKERBOARD
 import glob
+import json
+from pathlib import Path
 
 class OpenCVCamera(Camera):
 
-    def __init__(self, camera_id = 0, calibration_files = 'images\calibration\calibrate*.png'):
+    def __init__(self, camera_id = 0, calibration_file = None, calibration_images = 'images\calibration\calibrate*.png'):
         self.cap = cv2.VideoCapture(camera_id, cv2.CAP_DSHOW)
 
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        self.calibration_files = calibration_files
+
+        if calibration_file is None:
+            self.matrix, self.distortion = self.calibrate_camera(calibration_images)
+        else:
+            with open(calibration_file, 'r') as f:    
+                json_data = json.load(f)
+                print(json_data)
+                self.matrix, self.distortion = np.array(json_data['intrinsic']), np.array(json_data['distortion'])
 
     def read(self):
         _, img = self.cap.read()
@@ -30,7 +39,8 @@ class OpenCVCamera(Camera):
     def stop(self):
         self.cap.release()
 
-    def get_calibration(self, checkerBoard = CHECKERBOARD):
+    def calibrate_camera(self, calibration_images, checkerBoard = CHECKERBOARD):
+        
         # returns the intrinsic calibration matrix of the camera
         # Input: None
         # Output: The intrinsic calibration matrix, the distortion coefficients
@@ -62,8 +72,8 @@ class OpenCVCamera(Camera):
         # in a given directory. Since no path is
         # specified, it will take current directory
         # jpg files alone
-        images = glob.glob(self.calibration_files)
-        
+        images = glob.glob(calibration_images)
+        print(calibration_images)
         for filename in images:
             image = cv2.imread(filename)
             grayColor = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -104,7 +114,18 @@ class OpenCVCamera(Camera):
         
         print("\n Distortion coefficient:")
         print(distortion)
+
+        json_data = {
+            "intrinsic": matrix.tolist(),
+            "distortion": distortion.tolist()
+        }
+        with open(str(Path(__file__).parent.absolute())+"\calibration_opencv.json", 'w') as json_file:
+            json.dump(json_data, json_file)
+
         return matrix, distortion
+
+    def get_calibration(self):
+        return self.matrix, self.distortion
 
     def twoDto3D(self, input2D):
         raise NotImplementedError
