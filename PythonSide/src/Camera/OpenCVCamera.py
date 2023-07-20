@@ -129,3 +129,7 @@ class OpenCVCamera(Camera):
 
     def twoDto3D(self, input2D):
         raise NotImplementedError
+    
+    def getPointCloudCentre(self, pc):
+        raise NotImplementedError
+

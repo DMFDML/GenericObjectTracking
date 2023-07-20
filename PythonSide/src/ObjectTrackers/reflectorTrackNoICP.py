@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 import time
 from Util.objectTrackingConstants import *
+from Util.helperFunctions import *
 import socket
 
 from math import atan2, cos, acos, sin, sqrt, pi, asin
@@ -16,6 +17,7 @@ from pyk4a import CalibrationType
 import open3d as o3d
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+
 
 
 
@@ -212,8 +214,7 @@ class ReflectorTrackNoICP(ObjectTracker):
         pitch = asin(-normal[1])
         yaw = atan2(normal[0], normal[2])
 
-        quaternion = self._multiplyQuaternions([1/tan(pitch), 1,0,0], [1/tan(yaw), 0,1,0])
-        quaternion = quaternion / np.linalg.norm(quaternion)
+        quaternion = multiplyQuaternions([1/tan(pitch), 1,0,0], [1/tan(yaw), 0,1,0])
         return quaternion        
 
     def _drawPoints(self, img, points):
@@ -224,8 +225,7 @@ class ReflectorTrackNoICP(ObjectTracker):
 
             cv2.drawKeypoints(img, c['points'], img,   (0,0,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
             cv2.drawKeypoints(img, [c['centre']], img, (0,255,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        return img
-                
+        return img        
 
     def trackFrame(self, img, depth):
         # Calculate all reflectors within the frame
@@ -265,7 +265,7 @@ class ReflectorTrackNoICP(ObjectTracker):
 
             if started:
                 rotation, centre = self.trackFrame(ir_thresholded, depth)
-                self.sendData(rotation, centre) 
+                sendData(rotation, centre, self.sock, self.ip, self.port) 
                 ir_colour = self._drawPoints(ir_colour, self.points)
 
             

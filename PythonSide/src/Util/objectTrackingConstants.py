@@ -4,6 +4,7 @@ from ObjectTrackers.ObjectTrackerInterface import ObjectTracker
 # SiamMask Constants
 CONFIG = './SiamMask/PreTrainedModels/config_VOT.json'
 PRE_TRAINED_MODEL_SiamMask = './SiamMask/PreTrainedModels/SiamMask_VOT.pth'
+from Util.helperFunctions import *
 
 # Re3 Constants
 PRE_TRAINED_MODEL_Re3 = './re3-tensorflow/logs/checkpoints'
@@ -20,7 +21,8 @@ AZURE_CALIBRATION = "./src/Camera/calibration_azure.json"
 OPENCV_CALIBRATION = "./src/Camera/calibration_opencv.json"
 
 # The conversion between camera space to world space, opencv and azure kinect use mm but unity uses m so have to convert between!!
-DISTANCE_CONVERSION_AZURE = 100
+DISTANCE_CONVERSION_AZURE_POINT_CLOUD = 100
+DISTANCE_CONVERSION_AZURE_DEPTH = 1000
 DISTANCE_CONVERSION_ARUCO = 1000
 
 # Aruco Constants
@@ -65,17 +67,17 @@ OFFCET_DICT = {
         "translation": [0, 0, 0],
         "rotation": [cos(0.5 * pi/2), 0, sin(0.5 * pi/2), 0]
     },
-    10: { # top, Link 1 End
+    10: { # top, Link 2 End
         "translation": [0, 0, 0],
         "rotation": [cos(0.5 * -pi /2), sin(0.5 * -pi/2), 0, 0]
     },
-    12: { # bottom, Link 1 End
+    12: { # bottom, Link 3 End
         "translation": [0, 0, 0],
         "rotation": [cos(0.5 * pi /2), sin(0.5 * pi/2), 0,0]
     },
 
 }
-ARUCO_ROTATION_OFFCET = ObjectTracker._multiplyQuaternions(None, [cos(0.5 * pi), 0, sin(0.5 * pi), 0], [cos(0.5 * pi), 0, 0, sin(0.5 * pi)])
+ARUCO_ROTATION_OFFCET = multiplyQuaternions([cos(0.5 * pi), 0, sin(0.5 * pi), 0], [cos(0.5 * pi), 0, 0, sin(0.5 * pi)])
 # ARUCO_ROTATION_OFFCET = [1,0,0,0]
 
 CHECKERBOARD = (6,9)
@@ -86,3 +88,5 @@ IMAGE_FILE_LOCATIONS = "./images/benchmark_images/"
 
 # Benchmark Constants
 BENCHMARK_FILE = "./benchmark/benchmark_result"
+
+

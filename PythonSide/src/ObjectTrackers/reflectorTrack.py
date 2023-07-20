@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 import time
 from Util.objectTrackingConstants import *
+from Util.helperFunctions import *
 import socket
 
 from math import atan2, cos, sin, sqrt, pi
@@ -145,7 +146,7 @@ class ReflectorTrack(ObjectTracker):
 
         # If the point cloud has not got any points then don't perform ICP on it
         if (len(pc.points) == 0):
-            return self._rotationMatrixToQuaternion(self.previous_matrix), self.previous_centre
+            return rotationMatrixToQuaternion(self.previous_matrix), self.previous_centre
 
         # Perform either ICP or coloured ICP between the reference point cloud and the new one
         try:
@@ -165,16 +166,14 @@ class ReflectorTrack(ObjectTracker):
                                                                 max_iteration=self.no_iterations))
         except(RuntimeError):
             # If there is an error with the ICP then return the previous values
-            return self._rotationMatrixToQuaternion(self.previous_matrix), pc.get_center()
+            return rotationMatrixToQuaternion(self.previous_matrix), self.camera.getPointCloudCentre(pc)
             
         # Add the new point cloud to the original if there is enough overlap but not too much
         if (result_icp.inlier_rmse > 0.055 and result_icp.inlier_rmse < 0.3 and result_icp.fitness > 0.95):
-        
             self._addToOriginalPointCloud(pc, result_icp.transformation)
 
-        self.previous_matrix, self.previous_centre = result_icp.transformation, pc.get_center()
-        return self._rotationMatrixToQuaternion(result_icp.transformation), pc.get_center()
-
+        self.previous_matrix = result_icp.transformation
+        return rotationMatrixToQuaternion(result_icp.transformation), self.camera.getPointCloudCentre(pc)
     # Add all detected points, bounding box and polygon to the image
     def _drawPolygon(self, img):         
         if len(self.polygon) > 2:
@@ -210,7 +209,7 @@ class ReflectorTrack(ObjectTracker):
                 return self.previous_rotation, self.previous_centre
             else:
                 self._addToOriginalPointCloud(self.camera.getPointCloud(self.bounding_box, mask, self.colour), np.identity(4))
-                self.previous_centre = self.original_point_cloud.get_center()
+                self.previous_centre = self.camera.getPointCloudCentre(self.original_point_cloud)
                 return self.previous_rotation, self.previous_centre
         else:
             print("Could not read polygon")
@@ -236,15 +235,16 @@ class ReflectorTrack(ObjectTracker):
             
             if start:
                 rotation, translation = self.trackFrame(ir_thresholded) 
-                self.sendData(rotation, translation)
+                print(rotation, translation)
+                sendData(rotation, translation,self.sock,self.ip, self.port)
                 ir_colour = self._drawPolygon(ir_colour)
 
 
             # Calcuale fps and display
             fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
-            flip = cv2.flip(ir_colour, 1)
-            flip = cv2.putText(flip, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            cv2.imshow("tracking", flip)
+            # flip = cv2.flip(ir_colour, 1)
+            ir_colour = cv2.putText(ir_colour, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            cv2.imshow("tracking", ir_colour)
             # cv2.imshow("mask", mask * 255)
 
             # Press q to quit
@@ -278,10 +278,10 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 
-    camera = AzureKinectCamera(transformed = False, voxel_size=0.03, min_standard_deviation=1, point_cloud_threshold=2000)
+    camera = AzureKinectCamera(transformed = False, voxel_size=0.02, min_standard_deviation=1, point_cloud_threshold=1000)
     
    
-    objectTracker = ReflectorTrack(sock, camera, ip=args.ip, port=args.port, voxel_size=0.05, no_iterations=30, colour=True)
+    objectTracker = ReflectorTrack(sock, camera, ip=args.ip, port=args.port, voxel_size=0.02, no_iterations=30, colour=True)
 
     objectTracker.startTracking()
     

@@ -15,6 +15,7 @@ import argparse
 from ObjectTrackers.ObjectTrackerInterface import ObjectTracker
 
 from Util.objectTrackingConstants import *
+from Util.helperFunctions import *
 
 class GenericObjectTracker(ObjectTracker):
     def __init__(self, sock, tracker, camera, ip=UDP_IP, port=UDP_PORT, voxel_size = VOXEL_SIZE, colour = COLOUR, no_iterations = NO_ITERATIONS, box = []):
@@ -99,7 +100,7 @@ class GenericObjectTracker(ObjectTracker):
 
         # If the point cloud has not got any points then don't perform ICP on it
         if (len(pc.points) == 0):
-            return self._rotationMatrixToQuaternion(self.previous_matrix), self.previous_centre
+            return rotationMatrixToQuaternion(self.previous_matrix), self.previous_centre
         
         # Perform either ICP or coloured ICP between the reference point cloud and the new one
         try:
@@ -119,14 +120,15 @@ class GenericObjectTracker(ObjectTracker):
                                                                 max_iteration=self.no_iterations))
         except(RuntimeError):
             # If there is an error with the ICP then return the previous values
-            return self._rotationMatrixToQuaternion(self.previous_matrix), self.previous_centre
+            return rotationMatrixToQuaternion(self.previous_matrix), self.previous_centre
+
 
         # Add the new point cloud to the original if there is enough overlap but not too much
         if (result_icp.inlier_rmse > 0.08 and result_icp.inlier_rmse < 0.18 and result_icp.fitness > 0.95):
             self._addToOriginalPointCloud(pc, result_icp.transformation)
 
-        self.previous_matrix, self.previous_centre = result_icp.transformation, pc.get_center()
-        return self._rotationMatrixToQuaternion(result_icp.transformation), pc.get_center()
+        self.previous_matrix, self.previous_centre = result_icp.transformation, self.camera.getPointCloudCentre(pc)
+        return rotationMatrixToQuaternion(self.previous_matrix), self.previous_centre
 
     # Track the object for a frame
     def trackFrame(self, img):
@@ -135,9 +137,12 @@ class GenericObjectTracker(ObjectTracker):
         if (len(new_box) == 4):
             rotation, centre = self._getTranslationRotationMatrix(new_box)
             self.previous_rotation = rotation
-            return rotation, centre
+
+            self.tracker.drawBox(img)
+
+            return rotation, centre 
         else:
-            return self.previous_rotation, self.previous_centre
+            return self.previous_rotation, self.previous_centre 
         
     def startTracking(self):
         while True:
@@ -153,8 +158,8 @@ class GenericObjectTracker(ObjectTracker):
             # Only track object if a bounding box has been selected
             if (len(self.box) == 4):
                 rotation, centre = self.trackFrame(img)
-                self.sendData(rotation, centre)
-                tracker.drawBox(img)
+                sendData(rotation, centre,self.sock,self.ip, self.port)
+                self.tracker.drawBox(img)
 
             # Calcuale fps and display
             fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
@@ -163,7 +168,7 @@ class GenericObjectTracker(ObjectTracker):
             cv2.imshow("tracking", img)
 
             # Press q to quit and d to select a new bounding box
-            k = cv2.waitKey(1)
+            k = cv2.waitKey(0)
             if k & 0xFF == ord('q'):
                 break
             # press s to start the tracking
@@ -211,7 +216,8 @@ if __name__ == "__main__":
         raise ValueError("Invalid tracker type")
 
 
-    camera = AzureKinectCamera(voxel_size=args.voxel_size)
+    # camera = AzureKinectCamera(voxel_size=args.voxel_size)
+    camera = FakeCamera(transformed=True, imageFilePath=IMAGE_FILE_LOCATIONS, voxel_size=args.voxel_size)
     
     if not tracker is None:
         objectTracker = GenericObjectTracker(sock, tracker, camera, ip=args.ip, port=args.port, voxel_size=args.voxel_size, colour=args.colour, no_iterations=args.no_iterations, box=args.box)

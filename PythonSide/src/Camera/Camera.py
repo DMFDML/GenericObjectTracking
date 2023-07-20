@@ -45,4 +45,10 @@ class Camera(ABC):
         # Output: The intrinsic calibration matrix, the distortion coefficients
         pass
 
+    @abstractmethod
+    def getPointCloudCentre(self, pc):
+        # returns the centre of the point cloud in m
+        pass
+
+
 

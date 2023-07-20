@@ -6,7 +6,7 @@ from pyk4a import Config, PyK4A, Calibration, CalibrationType
 import open3d as o3d
 from Camera.Camera import Camera
 import copy
-from Util.objectTrackingConstants import DISTANCE_CONVERSION_AZURE
+from Util.objectTrackingConstants import *
 import os
 import json
 from pathlib import Path
@@ -47,7 +47,7 @@ class AzureKinectCamera(Camera):
 
     def getDepthimage(self):
         return self.capture.depth[:, :].copy()
-        
+
     def getIRimage(self):
         return self.capture.ir[:, :].copy()
 
@@ -69,7 +69,7 @@ class AzureKinectCamera(Camera):
             pc = pc[mask]
         
         # convert from mm to m as open3d didn't like the mm
-        pc = pc / DISTANCE_CONVERSION_AZURE
+        pc = pc / DISTANCE_CONVERSION_AZURE_POINT_CLOUD
         for standard_deviation_factor in np.arange(self.min_standard_deviation, 3, 0.1):
             thresholded_pc = pc[(pc[:,2] < np.mean(pc[:,2]) + standard_deviation_factor* pc[:,2].std()) & (pc[:,2] > np.mean(pc[:,2]) - standard_deviation_factor* pc[:,2].std())]
             if(thresholded_pc.shape[0] > self.point_cloud_threshold):
@@ -95,7 +95,7 @@ class AzureKinectCamera(Camera):
             pc = pc[mask]
             colour = colour[mask]
         
-        pc = pc / DISTANCE_CONVERSION_AZURE
+        pc = pc / DISTANCE_CONVERSION_AZURE_POINT_CLOUD
         colour = colour / 255
         for standard_deviation_factor in np.arange(self.min_standard_deviation, 3, 0.1):
             thresholded_pc = pc[(pc[:,2] < np.mean(pc[:,2]) + standard_deviation_factor* pc[:,2].std()) & (pc[:,2] > np.mean(pc[:,2]) - standard_deviation_factor* pc[:,2].std())]
@@ -129,6 +129,10 @@ class AzureKinectCamera(Camera):
         
         if self.transformed:
             # If the user wants the transformed depth point cloud or not
-            return self.capture.transformed_depth_point_cloud[coordinate[1]][coordinate[0]] / DISTANCE_CONVERSION_AZURE
+            return self.capture.transformed_depth_point_cloud[coordinate[1]][coordinate[0]] / DISTANCE_CONVERSION_AZURE_DEPTH
         else:
-            return self.capture.depth_point_cloud[coordinate[1]][coordinate[0]] / DISTANCE_CONVERSION_AZURE
+            return self.capture.depth_point_cloud[coordinate[1]][coordinate[0]] / DISTANCE_CONVERSION_AZURE_DEPTH
+
+    def getPointCloudCentre(self, pc):
+        return pc.get_center() / (DISTANCE_CONVERSION_AZURE_DEPTH / DISTANCE_CONVERSION_AZURE_POINT_CLOUD)
+ 

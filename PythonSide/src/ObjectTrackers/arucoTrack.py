@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 import time
 from Util.objectTrackingConstants import *
+from Util.helperFunctions import *
 import socket
 
 from math import atan2, cos, sin, sqrt, pi
@@ -101,13 +102,13 @@ class ArucoTracker(ObjectTracker):
             # Convert the rvec value to a 3x3 rotation matrix
             r = cv2.Rodrigues(rvec)
             # Convert the rotation matrix to Euler values (should probably just use Quaternion)
-            quaternion = self._rotationMatrixToQuaternion(r[0])
-            quaternion = self._multiplyQuaternions(ARUCO_ROTATION_OFFCET, quaternion)
+            quaternion = rotationMatrixToQuaternion(r[0])
+            quaternion = multiplyQuaternions(ARUCO_ROTATION_OFFCET, quaternion)
             offcet = OFFCET_DICT.get(ids[i][0], {"translation": [0, 0, 0], "rotation": [0, 0, 0, 0]})
 
 
             # Add rotaiton and translation offcets to the angles depending on which aruco is being seen
-            quaternion = self._multiplyQuaternions(offcet["rotation"], quaternion)
+            quaternion = multiplyQuaternions(offcet["rotation"], quaternion)
             centre = tvec + offcet['translation']
             
 
@@ -130,8 +131,9 @@ class ArucoTracker(ObjectTracker):
             
             # print(abs(quaternions[closest_aruco][0] - self.previous_rotation[0]))
             # if (abs(quaternions[closest_aruco][0] - self.previous_rotation[0]) < SMALL_ANGLE_VALUE):
-                # Send data, / 1000 is due to opencv working in mm and unity working in m
+            # Send data, / 1000 is due to opencv working in mm and unity working in m
             self.previous_rotation, self.previous_centre = (quaternions[closest_aruco], centre[closest_aruco] / DISTANCE_CONVERSION_ARUCO)
+
             return self.previous_rotation, self.previous_centre
 
         return self.previous_rotation, self.previous_centre
@@ -149,7 +151,7 @@ class ArucoTracker(ObjectTracker):
 
             if started:
                 rotation, centre = self.trackFrame(img)
-                self.sendData(rotation, centre)
+                sendData(rotation, centre, self.sock,self.ip, self.port)
 
                 self._aruco_display(self.display_values[0],self.display_values[1],self.display_values[2],self.display_values[3], img)
 
