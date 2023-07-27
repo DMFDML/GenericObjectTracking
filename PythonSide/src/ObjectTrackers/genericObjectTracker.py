@@ -138,8 +138,6 @@ class GenericObjectTracker(ObjectTracker):
             rotation, centre = self._getTranslationRotationMatrix(new_box)
             self.previous_rotation = rotation
 
-            self.tracker.drawBox(img)
-
             return rotation, centre 
         else:
             return self.previous_rotation, self.previous_centre 
@@ -216,8 +214,8 @@ if __name__ == "__main__":
         raise ValueError("Invalid tracker type")
 
 
-    # camera = AzureKinectCamera(voxel_size=args.voxel_size)
-    camera = FakeCamera(transformed=True, imageFilePath=IMAGE_FILE_LOCATIONS, voxel_size=args.voxel_size)
+    camera = AzureKinectCamera(voxel_size=args.voxel_size)
+    # camera = FakeCamera(transformed=True, imageFilePath=IMAGE_FILE_LOCATIONS, voxel_size=args.voxel_size)
     
     if not tracker is None:
         objectTracker = GenericObjectTracker(sock, tracker, camera, ip=args.ip, port=args.port, voxel_size=args.voxel_size, colour=args.colour, no_iterations=args.no_iterations, box=args.box)

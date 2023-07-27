@@ -53,7 +53,7 @@ ARUCO_DICT = {
 OFFCET_DICT = {
     7: { # front, Piston 1
         "translation": [0, 0, 0],
-        "rotation": [cos(0.5 * 0), 0, sin(0.5 * 0), 0]
+        "rotation": [cos(0), 0, sin(0), sin(0)]
     },
     11: { # back, Piston 2
         "translation": [0, 0, 0],

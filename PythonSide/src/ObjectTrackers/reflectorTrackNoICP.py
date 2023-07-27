@@ -83,7 +83,6 @@ class ReflectorTrackNoICP(ObjectTracker):
         self.moving_average_rotation.append(new_value)
 
         return np.sum(np.asarray(self.moving_average_rotation) * self.moving_average_weights.reshape(-1, 1)[:len(self.moving_average_rotation)], axis=0) / np.sum(self.moving_average_weights)
-    
 
     def _getPolygon(self, points):
         

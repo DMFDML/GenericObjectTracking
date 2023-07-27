@@ -205,6 +205,7 @@ class ReflectorTrack(ObjectTracker):
             # if the reference point cloud has been initialised then perform ICP otherwise create the reference pointcloud
             if (len(self.original_point_cloud.points) > 0):
                 rotation, centre = self._getTranslationRotationMatrix(mask, self.bounding_box)
+                rotation[2] *= -1
                 self.previous_rotation, self.previous_centre = rotation, centre
                 return self.previous_rotation, self.previous_centre
             else:

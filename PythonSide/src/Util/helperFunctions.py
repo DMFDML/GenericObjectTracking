@@ -3,6 +3,7 @@ from math import pi, atan2, sqrt, asin
 import numpy as np
 import json
 import socket
+from pyquaternion import Quaternion
 
 
 # Sends data to unity
@@ -53,3 +54,7 @@ def quaternionToEuler(rotation):
     yaw = atan2(2 * (w * z + x * y), 1 - 2 * (y**2 + z**2)) 
 
     return np.array([roll, pitch, yaw])
+
+def quaternionInverse(q):
+    new_q = Quaternion(q)
+    return new_q.inverse

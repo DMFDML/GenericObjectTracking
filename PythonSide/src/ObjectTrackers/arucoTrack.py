@@ -110,6 +110,7 @@ class ArucoTracker(ObjectTracker):
             # Add rotaiton and translation offcets to the angles depending on which aruco is being seen
             quaternion = multiplyQuaternions(offcet["rotation"], quaternion)
             centre = tvec + offcet['translation']
+            quaternion[1] *= -1
             
 
             quaternions.append(quaternion)

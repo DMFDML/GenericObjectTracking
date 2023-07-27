@@ -76,7 +76,7 @@ public class FromPython : MonoBehaviour
         DataPacket data = JsonUtility.FromJson<DataPacket>(json);
 
         
-        rotation = Quaternion.Euler(new Vector3(data.box.rotation[0], data.box.rotation[1], data.box.rotation[2]));
+        rotation = new Quaternion(data.box.rotation[1], data.box.rotation[2], data.box.rotation[3], data.box.rotation[0]);
         centre = new Vector3(data.box.centre[0], data.box.centre[1], data.box.centre[2]);
 
         // print(new Vector3(data.box.rotation[0], data.box.rotation[1], data.box.rotation[2]));
@@ -93,6 +93,7 @@ public class FromPython : MonoBehaviour
     void Update(){
         // Debug.Log(average_rotation);
         // rollingAverage();
+        
         transform.rotation = rotation;
         transform.position = centre;
 
