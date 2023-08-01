@@ -4,34 +4,34 @@ This File contains all the code to run the 6D pose estimation algorithms
 
 Docs:
 * **benchmark**
-  * [benchmark.py](..\docs\Benchmark\benchmark.md)
-  * [plotData.py](..\docs\Benchmark\plotData.md)
-  * [plotSingleRunData.py](..\docs\Benchmark\plotSingleRunData.md)
-  * [saveBenchmarkImages.py](..\docs\Benchmark\saveBenchmarkImages.md)
-  * [showInUnity.py](..\docs\Benchmark\showInUnity.md)
-* [images](..\docs\Images\images.md)
+  * [benchmark.py](\docs\Benchmark\benchmark.md)
+  * [plotData.py](\docs\Benchmark\plotData.md)
+  * [plotSingleRunData.py](\docs\Benchmark\plotSingleRunData.md)
+  * [saveBenchmarkImages.py](\docs\Benchmark\saveBenchmarkImages.md)
+  * [showInUnity.py](\docs\Benchmark\showInUnity.md)
+* [images](\docs\Images\images.md)
 * **re3-tensorflow**
 * **SiamMask**
 * **src**
   * **Camera**
-    * [AzureKinect.py](..\docs\Camera\AzureKinect.md)
-    * [Camera.py](..\docs\Camera\Camera.md)
-    * [FakeCamera.py](..\docs\Camera\FakeCamera.md)
-    * [OpenCVCamera.py](..\docs\Camera\OpenCVCamera.md)
+    * [AzureKinect.py](\docs\Camera\AzureKinect.md)
+    * [Camera.py](\docs\Camera\Camera.md)
+    * [FakeCamera.py](\docs\Camera\FakeCamera.md)
+    * [OpenCVCamera.py](\docs\Camera\OpenCVCamera.md)
   * **ObjectTrackers**
-    * [arucoTrack.py](..\docs\ObjectTrackers\arucoTrack.md)
-    * [genericObjectTracker.py](..\docs\ObjectTrackers\genericObjectTracker.md)
-    * [ObjectTrackerInterface.py](..\docs\ObjectTrackers\ObjectTrackerInterface.md)
-    * [reflectorTrack.py](..\docs\ObjectTrackers\reflectorTrack.md)
-    * [reflectorTrackNoICP.py](..\docs\ObjectTrackers\reflectorTrackNoICP.md)
+    * [arucoTrack.py](\docs\ObjectTrackers\arucoTrack.md)
+    * [genericObjectTracker.py](\docs\ObjectTrackers\genericObjectTracker.md)
+    * [ObjectTrackerInterface.py](\docs\ObjectTrackers\ObjectTrackerInterface.md)
+    * [reflectorTrack.py](\docs\ObjectTrackers\reflectorTrack.md)
+    * [reflectorTrackNoICP.py](\docs\ObjectTrackers\reflectorTrackNoICP.md)
   * **Trackers2D**
-    * [Re3.py](..\docs\Trackers2D\Re3.md)
-    * [SiamMask.py](..\docs\Trackers2D\SiamMask.md)
-    * [TrackerInterface.py](..\docs\Trackers2D\TrackerInterface.md)
+    * [Re3.py](\docs\Trackers2D\Re3.md)
+    * [SiamMask.py](\docs\Trackers2D\SiamMask.md)
+    * [TrackerInterface.py](\docs\Trackers2D\TrackerInterface.md)
   * **Util**
-    * [helperFunctions.py](..\docs\Util\helperFunctions.md)
-    * [objectTrackingConstants.py](..\docs\Util\objectTrackingConstants.md)
-    * [showPointCloud.py](..\docs\Util\showPointCloud.md)
+    * [helperFunctions.py](\docs\Util\helperFunctions.md)
+    * [objectTrackingConstants.py](\docs\Util\objectTrackingConstants.md)
+    * [showPointCloud.py](\docs\Util\showPointCloud.md)
 * **triad_openvr**
 
 
