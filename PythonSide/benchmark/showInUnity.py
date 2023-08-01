@@ -99,15 +99,12 @@ def sendData(rotation, translation, sock, ip = "127.0.0.1", port = 5065):
     packet = json.dumps(data, indent=3)
     sock.sendto( (packet).encode(), (ip, port) )
 
-def benchMark(file, tracker_method, camera, vive_file):
+def benchMark(tracker_method, camera, vive_file):
     # benchmark the tracker
-    # Input: speed_file, The open file for frame rate data
-    #        translation_rotation, The open file for tranlation and rotation data
+    # Input: translation_rotation, The open file for tranlation and rotation data
     #        tracker_method, The tracker being used
     #        camera, The camera being used
     # Output: None
-
-    file.write("Frame,Time,Rotation,Rotation_z,Translation\n" )
     frame = FRAME_OFFSET
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     camera.currentImage = ROTATION_START_IMAGE
@@ -193,12 +190,8 @@ if __name__ == "__main__":
 
     camera, objectTracker = pickTracker(args)
 
-    file = open(args.videoPath + "../" + f"{objectTracker.name}.csv", "a")
-    print(file)
-    camera.currentImage = 0
-    benchMark(file, objectTracker, camera, vive_file)
+    benchMark(objectTracker, camera, vive_file)
 
-    file.close()
     if args.vive:
         vive_file.close()
 

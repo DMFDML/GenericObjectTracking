@@ -46,6 +46,13 @@ class Camera(ABC):
         pass
 
     @abstractmethod
+    def twoDto3D(self, coordinate):
+        # converts a 2D coordinate to a 3D coordinate
+        # Input: The 2D coordinate
+        # Output: The 3D coordinate
+        pass
+
+    @abstractmethod
     def getPointCloudCentre(self, pc):
         # returns the centre of the point cloud in m
         pass

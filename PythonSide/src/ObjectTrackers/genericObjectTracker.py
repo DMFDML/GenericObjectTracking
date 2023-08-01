@@ -2,7 +2,7 @@ import sys
 sys.path.append('./src/')
 import cv2
 from Trackers2D.SiamMask import SiamMaskSharpTracker
-from Trackers2D.Re3 import Re3Tracker
+# from Trackers2D.Re3 import Re3Tracker
 import socket
 import json
 from math import atan2, cos, sin, sqrt, pi

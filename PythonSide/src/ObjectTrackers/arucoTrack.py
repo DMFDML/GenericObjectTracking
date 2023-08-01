@@ -39,22 +39,11 @@ class ArucoTracker(ObjectTracker):
                               [-marker_size / 2, -marker_size / 2, 0]], dtype=np.float32)
         self.marker_size = marker_size
 
-        self.moving_average_rotation = [(0,0,0)]
-        # self.moving_average_translation = [(0,0,0)]
-        self.moving_average_length = 5
-        self.moving_average_weights = np.array([0.2,0.2,0.4,0.4,0.6,0.6,0.8,0.8,1,1])
+    
         self.display_values = [[],[],[],[]]
 
         self.previous_rotation = np.array([0,0,0,0])
         self.previous_centre = np.array([0,0,0])
-
-    def _moving_average(self, new_value):
-        if len(self.moving_average_rotation) >= self.moving_average_length:
-            self.moving_average_rotation.pop(0)
-
-        self.moving_average_rotation.append(new_value)
-
-        return np.mean(np.array(self.moving_average_rotation), axis=0)
 
     def _aruco_display(self, corners, ids, rvecs, tvecs,image, colour=(0, 0, 255)):
         if len(corners) > 0:

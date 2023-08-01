@@ -19,10 +19,7 @@ def getValues(data):
             precision_rotation = d['rotation'].std()
             precision_translation = d['translation'].std()
             
-            csvfile.write(f"{d['object']},{d['tracker']},{avg_speed},{accuracy_rotation},{precision_rotation},{accuracy_translation},{precision_translation}\n")
-        
-        
-
+            csvfile.write(f"{d['object']},{d['tracker']},{avg_speed},{accuracy_rotation},{precision_rotation},{accuracy_translation},{precision_translation}\n")     
 
 def plotSpeed(data):
     fig, ax = plt.subplots(2,2, figsize=(20,10))

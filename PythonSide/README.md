@@ -1,8 +1,41 @@
 # Introduction
 
+This File contains all the code to run the 6D pose estimation algorithms
+
+Docs:
+* **benchmark**
+  * [benchmark.py](..\docs\Benchmark\benchmark.md)
+  * [plotData.py](..\docs\Benchmark\plotData.md)
+  * [plotSingleRunData.py](..\docs\Benchmark\plotSingleRunData.md)
+  * [saveBenchmarkImages.py](..\docs\Benchmark\saveBenchmarkImages.md)
+  * [showInUnity.py](..\docs\Benchmark\showInUnity.md)
+* [images](..\docs\Images\images.md)
+* **re3-tensorflow**
+* **SiamMask**
+* **src**
+  * **Camera**
+    * [AzureKinect.py](..\docs\Camera\AzureKinect.md)
+    * [Camera.py](..\docs\Camera\Camera.md)
+    * [FakeCamera.py](..\docs\Camera\FakeCamera.md)
+    * [OpenCVCamera.py](..\docs\Camera\OpenCVCamera.md)
+  * **ObjectTrackers**
+    * [arucoTrack.py](..\docs\ObjectTrackers\arucoTrack.md)
+    * [genericObjectTracker.py](..\docs\ObjectTrackers\genericObjectTracker.md)
+    * [ObjectTrackerInterface.py](..\docs\ObjectTrackers\ObjectTrackerInterface.md)
+    * [reflectorTrack.py](..\docs\ObjectTrackers\reflectorTrack.md)
+    * [reflectorTrackNoICP.py](..\docs\ObjectTrackers\reflectorTrackNoICP.md)
+  * **Trackers2D**
+    * [Re3.py](..\docs\Trackers2D\Re3.md)
+    * [SiamMask.py](..\docs\Trackers2D\SiamMask.md)
+    * [TrackerInterface.py](..\docs\Trackers2D\TrackerInterface.md)
+  * **Util**
+    * [helperFunctions.py](..\docs\Util\helperFunctions.md)
+    * [objectTrackingConstants.py](..\docs\Util\objectTrackingConstants.md)
+    * [showPointCloud.py](..\docs\Util\showPointCloud.md)
+* **triad_openvr**
+
+
 # Setup 
-
-
 
 ## SiamMask
 
@@ -49,3 +82,12 @@ pip install torchvision===0.5.0
 pip install tensorflow-gpu==1.9.0
 pip install tensorflow-tensorboard==1.5.1
 ```
+
+# Usage
+
+To use a specific tracker:
+1. Plug in the Azure kinect camera.
+2. Make sure that the Camera being used in the code is AzureKinectCamera.
+3. from this directory run python ./src/ObjectTrackers/genericObjectTracker.py.
+4. When the video has loaded press `d` and draw a bounding box around the object wanting to be tracked.
+

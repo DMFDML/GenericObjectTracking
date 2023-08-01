@@ -32,10 +32,6 @@ class ReflectorTrackNoICP(ObjectTracker):
         self.ip = ip
         self.port = port
 
-        self.moving_average_rotation = [(0,0,0)]
-        # self.moving_average_translation = [(0,0,0)]
-        self.moving_average_length = 10
-        self.moving_average_weights = np.array([0.2,0.2,0.4,0.4,0.6,0.6,0.8,0.8,1,1])
         # Set up the detector with default parameters.
         # Setup SimpleBlobDetector parameters.
         params = cv2.SimpleBlobDetector_Params()
@@ -69,20 +65,6 @@ class ReflectorTrackNoICP(ObjectTracker):
         self.previous_rotation = np.array([0,0,0])
         self.previous_centre = np.array([0,0,0])
         
-    def _movingAverage(self, new_value):
-        if len(self.moving_average_rotation) >= self.moving_average_length:
-            self.moving_average_rotation.pop(0)
-        if new_value[0] < 0:
-            new_value[0] += 2*pi
-        if new_value[1] < 0:
-            new_value[1] += 2*pi
-        if new_value[2] < 0:
-            new_value[2] += 2*pi
-
-
-        self.moving_average_rotation.append(new_value)
-
-        return np.sum(np.asarray(self.moving_average_rotation) * self.moving_average_weights.reshape(-1, 1)[:len(self.moving_average_rotation)], axis=0) / np.sum(self.moving_average_weights)
 
     def _getPolygon(self, points):
         
