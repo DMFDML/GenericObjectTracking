@@ -4,8 +4,8 @@ This File contains all the code to run the 6D pose estimation algorithms
 
 Docs:
 * **benchmark**
-  * [benchmark.py](\docs\Benchmark\benchmark.md)
-  * [plotData.py](\docs\Benchmark\plotData.md)
+  * [benchmark.py](docs\Benchmark\benchmark.md)
+  * [plotData.py](/docs/Benchmark/plotData.md)
   * [plotSingleRunData.py](\docs\Benchmark\plotSingleRunData.md)
   * [saveBenchmarkImages.py](\docs\Benchmark\saveBenchmarkImages.md)
   * [showInUnity.py](\docs\Benchmark\showInUnity.md)
