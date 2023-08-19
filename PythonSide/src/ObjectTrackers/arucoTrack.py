@@ -186,6 +186,7 @@ if __name__ == "__main__":
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     camera = OpenCVCamera(camera_id=args.cameraid, calibration_images=args.calibration_image, calibration_file=args.calibration_file)    
+    # camera = FakeCamera(transformed=False, imageFilePath="../../A_LARGE_images/images_vive_aruco/benchmark_images/")
    
     objectTracker = ArucoTracker(sock, camera, args.type, ip=args.ip, port=args.port, marker_size=args.marker)
 

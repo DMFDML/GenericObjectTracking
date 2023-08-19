@@ -261,7 +261,7 @@ if __name__ == "__main__":
 
 
     camera = AzureKinectCamera(transformed = False, voxel_size=0.02, min_standard_deviation=1, point_cloud_threshold=1000)
-    
+    # camera = FakeCamera(transformed=False, imageFilePath="../../A_LARGE_images/images_vive_reflector/benchmark_images/")
    
     objectTracker = ReflectorTrack(sock, camera, ip=args.ip, port=args.port, voxel_size=0.02, no_iterations=30, colour=True)
 

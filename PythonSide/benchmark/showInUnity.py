@@ -150,7 +150,7 @@ def benchMark(tracker_method, camera, vive_file):
         frame += 1        
 
         cv2.imshow("tracking", img)
-        k = cv2.waitKey( 1)
+        k = cv2.waitKey( 0)
         if k & 0xFF == ord('q'):
             break
 

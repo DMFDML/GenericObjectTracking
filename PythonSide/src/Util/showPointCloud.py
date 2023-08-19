@@ -30,6 +30,9 @@ if __name__ == "__main__":
     # pcds = loadPCD(12, "images/pc", np.array([1, 0, 0]))
     # originals = loadPCD(10, "images/original", np.array([0, 0, 1]))
     originalPcd = o3d.io.read_point_cloud("images/original.ply")
+    newPcd = o3d.io.read_point_cloud("images/new.ply")
+    originalPcd.paint_uniform_color([0,0,1])
+    newPcd.paint_uniform_color([1,0,0])
     # originalPcd.paint_uniform_color([0,0,1])
 
     # pcd = o3d.io.read_point_cloud("/images/pcBroken.ply")
@@ -38,7 +41,7 @@ if __name__ == "__main__":
     # source_down = source.voxel_down_sample(0.04)
     # target_down = source2.voxel_down_sample(0.04)
 
-    o3d.visualization.draw_geometries([originalPcd])
+    o3d.visualization.draw_geometries([originalPcd, newPcd])
     # o3d.visualization.draw_geometries(pcds + originals)
 
     # source_down.estimate_normals(

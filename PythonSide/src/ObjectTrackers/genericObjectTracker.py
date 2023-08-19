@@ -215,8 +215,9 @@ if __name__ == "__main__":
 
 
     camera = AzureKinectCamera(voxel_size=args.voxel_size)
-    # camera = FakeCamera(transformed=True, imageFilePath=IMAGE_FILE_LOCATIONS, voxel_size=args.voxel_size)
+    # camera = FakeCamera(transformed=True, imageFilePath="../../A_LARGE_images/images_cylinder_general/benchmark_images/", voxel_size=args.voxel_size)
     
+
     if not tracker is None:
         objectTracker = GenericObjectTracker(sock, tracker, camera, ip=args.ip, port=args.port, voxel_size=args.voxel_size, colour=args.colour, no_iterations=args.no_iterations, box=args.box)
 

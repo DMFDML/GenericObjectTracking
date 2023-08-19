@@ -230,6 +230,7 @@ class ReflectorTrackNoICP(ObjectTracker):
         while True:
             # Start timer for fps calculation
             timer = cv2.getTickCount()
+            
             try:
                 img = self.camera.read()
                 ir = self.camera.getIRimage().copy()
@@ -259,7 +260,7 @@ class ReflectorTrackNoICP(ObjectTracker):
             cv2.imshow("tracking", ir_colour)
 
             # Press q to quit
-            k = cv2.waitKey(1)
+            k = cv2.waitKey(0)
             if k & 0xFF == ord('q'):
                 break
             # elif k & 0xFF == ord('p'):
@@ -302,6 +303,8 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     camera = AzureKinectCamera(transformed = False, voxel_size=0.025)
+    # camera = FakeCamera(transformed=False, imageFilePath="../../A_LARGE_images/images_vive_reflector/benchmark_images/")
+    
     
     objectTracker = ReflectorTrackNoICP(sock, camera, ip=args.ip, port=args.port)
 
