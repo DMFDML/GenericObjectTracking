@@ -74,7 +74,7 @@ def plotValues(data, graph_type='time', graph_lable = 'Time (s)', best_case_valu
     fig.legend(Line[:4], Label[:4], loc='lower center', bbox_to_anchor=(0.5, -0.02), ncol=4)
     fig.savefig(f"benchmark\\results\\graphsAndValues\\frame_vs_{graph_type}_all.png")
 
-def plotTranslationAndRotation(data, best_case_values = [0.377, 0.11], y_mins=[0, 0,0,0], y_maxs=[2.5, 0.2, 0.6]):
+def plotTranslationAndRotation(data, best_case_values = [0.377, 0.011], y_mins=[0, 0,0,0], y_maxs=[2.5, 0.2, 0.6]):
     fig, ax = plt.subplots(3,3, figsize=(20,10))
     fig.tight_layout()
     objects = ['coin', 'cylinder', 'screw', 'vive']

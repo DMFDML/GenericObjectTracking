@@ -27,14 +27,14 @@ def saveValues(data):
             values[3].append(d)
     
     for v in values:
-        mean_t = np.array([d['time'] for d in v]).mean(axis=0)
-        mean_r = np.array([d['rotation'] for d in v]).mean(axis=0)
-        mean_p = np.array([d['translation'] for d in v]).mean(axis=0)
-        std_t = np.array([d['time'] for d in v]).std(axis=0)
-        std_r = np.array([d['rotation'] for d in v]).std(axis=0)
-        std_p = np.array([d['translation'] for d in v]).std(axis=0)
+        mean_t = np.array([d['time'] for d in v]).mean()
+        mean_r = np.array([d['rotation'] for d in v]).mean()
+        mean_p = np.array([d['translation'] for d in v]).mean()
+        std_t = np.array([d['time'] for d in v]).std()
+        std_r = np.array([d['rotation'] for d in v]).std()
+        std_p = np.array([d['translation'] for d in v]).std()
 
-        file.write(f"{v[0]['tracker']},{mean_t.mean()},{mean_r.mean()},{std_r.mean()},{mean_p.mean()},{std_p.mean()}\n")
+        file.write(f"{v[0]['tracker']},{mean_t},{mean_r},{std_r},{mean_p},{std_p}\n")
             
 
 
